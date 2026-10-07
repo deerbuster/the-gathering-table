@@ -90,3 +90,12 @@ test('table requirements validate physical locations, virtual platforms and voic
   assert.throws(() => validateInput({ ...input, tableType: 'Theater of the Mind', voiceService: 'Other', voiceOther: '' }));
   assert.doesNotThrow(() => validateInput({ ...input, tableType: 'Theater of the Mind', voiceService: 'Other', voiceOther: 'Mumble' }));
 });
+
+test('profile pictures are bounded JPEG data and reject external URLs and SVG', async () => {
+  const { validProfilePhoto } = await import('../src/app/core/profile-photo');
+  assert.equal(validProfilePhoto(''), true);
+  assert.equal(validProfilePhoto('data:image/jpeg;base64,/9j/2Q=='), true);
+  assert.equal(validProfilePhoto('https://example.com/photo.jpg'), false);
+  assert.equal(validProfilePhoto('data:image/svg+xml;base64,AAAA'), false);
+  assert.equal(validProfilePhoto('data:image/jpeg;base64,' + 'A'.repeat(90000)), false);
+});

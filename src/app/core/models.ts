@@ -58,6 +58,7 @@ export interface Review {
   createdAt: Timestamp;
 }
 export interface Profile {
+  photoURL?: string;
   username: string;
   biography: string;
   pastPlayerReviews: Review[];

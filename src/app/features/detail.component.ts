@@ -1,3 +1,4 @@
+import { AvatarComponent } from '../shared/avatar.component';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -12,7 +13,7 @@ import { LifecycleStatus } from '../core/models';
 import { MessageService } from '../core/message.service';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
-@Component({ imports: [RouterLink, DatePipe, ReactiveFormsModule], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './detail.component.html' })
+@Component({ imports: [AvatarComponent, RouterLink, DatePipe, ReactiveFormsModule], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './detail.component.html' })
 export class DetailComponent {
   readonly auth = inject(AuthService);
   private readonly service = inject(CampaignService);
@@ -32,10 +33,10 @@ export class DetailComponent {
   readonly timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   private readonly campaign$ = this.route.paramMap.pipe(switchMap(params => this.service.watchCampaign(params.get('id')!).pipe(catchError(error => { this.loadError.set(friendlyError(error)); return of(null); }))));
   readonly campaign = toSignal(this.campaign$);
-  readonly roster = toSignal(this.campaign$.pipe(switchMap(c => c ? combineLatest([c.gmUserId, ...c.playerIds].map(uid => this.service.watchProfile(uid).pipe(map(profile => ({ uid, name: profile?.username ?? (uid === c.gmUserId ? c.gmName : 'Adventurer'), gm: uid === c.gmUserId, allowMessages: profile?.allowCampaignMessages ?? false })), catchError(() => of({ uid, name: 'Adventurer', gm: uid === c.gmUserId, allowMessages: false }))))) : of([])), catchError(() => of([]))), { initialValue: [] });
+  readonly roster = toSignal(this.campaign$.pipe(switchMap(c => c ? combineLatest([c.gmUserId, ...c.playerIds].map(uid => this.service.watchProfile(uid).pipe(map(profile => ({ uid, name: profile?.username ?? (uid === c.gmUserId ? c.gmName : 'Adventurer'), gm: uid === c.gmUserId, photoURL: profile?.photoURL ?? '', allowMessages: profile?.allowCampaignMessages ?? false })), catchError(() => of({ uid, name: 'Adventurer', gm: uid === c.gmUserId, photoURL: '', allowMessages: false }))))) : of([])), catchError(() => of([]))), { initialValue: [] });
   readonly retired = toSignal(this.campaign$.pipe(switchMap(c => {
     const ids = c?.retiredPlayerIds.filter(uid => !c.playerIds.includes(uid)) ?? [];
-    return ids.length ? combineLatest(ids.map(uid => this.service.watchProfile(uid).pipe(map(profile => ({ uid, name: profile?.username ?? 'Adventurer', allowMessages: profile?.allowCampaignMessages ?? false })), catchError(() => of({ uid, name: 'Adventurer', allowMessages: false }))))) : of([]);
+    return ids.length ? combineLatest(ids.map(uid => this.service.watchProfile(uid).pipe(map(profile => ({ uid, name: profile?.username ?? 'Adventurer', photoURL: profile?.photoURL ?? '', allowMessages: profile?.allowCampaignMessages ?? false })), catchError(() => of({ uid, name: 'Adventurer', photoURL: '', allowMessages: false }))))) : of([]);
   })), { initialValue: [] });
   readonly applicants = toSignal(this.campaign$.pipe(switchMap(c => c?.pendingPlayerIds.length ? combineLatest(c.pendingPlayerIds.map(uid => this.service.watchProfile(uid).pipe(map(profile => ({ uid, name: profile?.username ?? 'Adventurer' })), catchError(() => of({ uid, name: 'Adventurer' }))))) : of([])), catchError(() => of([]))), { initialValue: [] });
   readonly html = computed(() => DOMPurify.sanitize(marked.parse(this.campaign()?.description ?? '', { async: false }), { USE_PROFILES: { html: true } }));
@@ -89,3 +90,4 @@ export class DetailComponent {
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'gathering-table-session.ics'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
+

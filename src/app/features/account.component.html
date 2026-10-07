@@ -6,12 +6,14 @@
     <section class="panel mt-6"><div class="section-heading"><h2>Your player profile</h2><button class="text-link" type="button" (click)="logout()">Sign out</button></div>
       @if (auth.demo) { <p class="muted">You are using a sample identity. Profile changes stay in this preview.</p> }
       <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="form-stack">
+        <div class="action-row"><app-avatar [name]="profileForm.controls.username.value" [photoURL]="photoPreview()" [large]="true"/><label>Profile picture<input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="busy() || photoBusy()" (change)="choosePhoto($event)"></label>@if (photoPreview()) { <button class="text-link" type="button" [disabled]="busy() || photoBusy()" (click)="removePhoto()">Remove picture</button> }</div>
+        <p class="field-help">JPG, PNG or WebP, up to 5 MB. Pictures are cropped to a square and public. Click Save profile to keep your changes.</p>
         <label>Public player name<input formControlName="username" maxlength="60" required autocomplete="nickname"></label>
         <label>Biography<textarea formControlName="biography" rows="5" maxlength="4000" placeholder="Your favorite systems, play style, and what you bring to a table."></textarea></label>
         <label class="toggle-label"><input type="checkbox" formControlName="allowCampaignMessages"><span>Allow incoming campaign messages</span></label>
         <p class="field-help">Opt in to questions from other users about campaigns where you are a current or retired player. Turning this off stops unsolicited incoming messages. You can still receive replies in conversations you started. Existing conversations remain readable. GMs can always be contacted about their own campaigns.</p>
         <p class="field-help">Your name, biography, and reviews are public. Keep contact details private.</p>
-        <div class="action-row"><button class="button primary" [disabled]="busy() || profileForm.invalid">{{ busy() ? 'Saving…' : 'Save profile' }}</button><a [routerLink]="['/profile', user.uid]" class="text-link">View public profile →</a></div>
+        <div class="action-row"><button class="button primary" [disabled]="busy() || photoBusy() || profileForm.invalid">{{ photoBusy() ? 'Preparing picture…' : busy() ? 'Saving…' : 'Save profile' }}</button><a [routerLink]="['/profile', user.uid]" class="text-link">View public profile →</a></div>
       </form>
     </section>
     <a routerLink="/games" class="text-link mt-6 inline-block">Back to the tables →</a>
@@ -21,6 +23,7 @@
     <section class="panel mt-6"><div class="tabs mb-6"><button type="button" [class.selected]="mode() === 'login'" (click)="mode.set('login')">Sign in</button><button type="button" [class.selected]="mode() === 'register'" (click)="mode.set('register')">Create account</button></div>
       <form [formGroup]="form" (ngSubmit)="submit()" class="form-stack">
         @if (mode() === 'register') { <label>Public player name<input formControlName="username" maxlength="60" autocomplete="nickname"></label> }
+        @if (mode() === 'register') { <p class="field-help">Incoming campaign messages are enabled by default. You can turn them off in your profile after signing up.</p> }
         <label>Email<input type="email" formControlName="email" autocomplete="email" required></label>
         <label>Password<input type="password" formControlName="password" [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'" minlength="8" required></label>
         @if (form.invalid && form.touched) { <p class="error-text">Enter a valid email and a password of at least 8 characters.</p> }

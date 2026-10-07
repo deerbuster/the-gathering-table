@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | username | string | Public name, maximum 60 characters |
 | biography | string | Public biography, maximum 4,000 characters |
-| allowCampaignMessages | boolean | Opt into questions as a current or retired player; defaults false |
+| allowCampaignMessages | boolean | Opt into questions as a current or retired player; defaults true for new profiles; existing choices are preserved |
 | pastPlayerReviews | array of Review maps | Bounded cache, first 20 verified reviews |
 
 `/users/{targetUid}/reviews/{campaignId}_{reviewerUid}` is the canonical immutable review document. It contains `id`, integer `rating` (1–5), `text` (maximum 2,000 characters), `reviewerName` snapshot, `reviewerId`, `campaignId`, and native Timestamp `createdAt`. Both users must be accepted or retired participants of the completed campaign, or be its GM. The reviewer name must equal their current profile name. An atomic transaction creates the review and appends to the target's cache if it has fewer than 20 entries. Security rules check the post-transaction state using getAfter. Beyond 20 reviews only the canonical document is created.
@@ -93,3 +93,6 @@ The included demo already uses this schema. If upgrading a previously deployed p
 Older campaign documents also need the eight meeting-detail fields above. Confirm each table's venue/platform, voice service, and recording/broadcast practice before populating them; unrelated fields must be empty or null according to tableType. The editor normalizes those fields when switching types. Meeting metadata edits use the existing GM revision/confirmation workflow. Disclosure does not itself record, stream, or connect to those services.
 
 `/conversations/{conversationId}/reads/{authUid}` stores a native Timestamp `readThrough`. Only that participant can get or monotonically update their own receipt; other users cannot read it. Unread counts compare incoming message timestamps against this watermark. The current small-community implementation subscribes to message histories for inbox counts; pagination and server-maintained summaries would be needed at scale. Pending-application alerts derive in realtime from hosted campaigns and remain visible until resolved.
+
+Profile photoURL is optional for backward compatibility. The uploader accepts JPG/PNG/WebP up to 5 MB, center-crops and re-encodes a 256px JPEG (removing source metadata), and stores a bounded JPEG data URI (90,000 characters maximum) in the profile. Rules allow only the owner to change it; empty removes it. No Storage bucket or external image URL is required. Profiles and active/retired rosters show the picture, with initials on missing or failed images.
+

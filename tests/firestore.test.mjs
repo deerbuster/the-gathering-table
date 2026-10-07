@@ -272,3 +272,15 @@ test('voice-only tables require voice and clear virtual platform; recording flag
   await assertFails(updateDoc(ref('gm'), { recorded: 'yes', scheduleState: 'Recruiting', scheduleRevision: 1 }));
   await assertSucceeds(updateDoc(ref('gm'), { tableType: 'Theater of the Mind', virtualPlatform: null, voiceService: 'Other', voiceOther: 'Mumble', recorded: false, broadcast: true, scheduleState: 'Recruiting', scheduleRevision: 1 }));
 });
+
+test('owners can add/remove bounded profile pictures without changing message preferences', async () => {
+  const own = doc(db('a'), 'users', 'a');
+  await assertSucceeds(updateDoc(own, { photoURL: 'data:image/jpeg;base64,/9j/2Q==' }));
+  assert.equal((await getDoc(own)).data().allowCampaignMessages, false);
+  await assertFails(updateDoc(doc(db('b'), 'users', 'a'), { photoURL: '' }));
+  await assertFails(updateDoc(own, { photoURL: 'https://example.com/photo.jpg' }));
+  await assertFails(updateDoc(own, { photoURL: 'data:image/svg+xml;base64,AAAA' }));
+  await assertFails(updateDoc(own, { photoURL: 'data:image/jpeg;base64,' + 'A'.repeat(90000) }));
+  await assertSucceeds(updateDoc(own, { photoURL: '' }));
+  await assertSucceeds(setDoc(doc(db('new-player'), 'users', 'new-player'), { ...profile, allowCampaignMessages: true, photoURL: '' }));
+});

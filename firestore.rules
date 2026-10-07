@@ -106,7 +106,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     function profileValid(p) {
-      return p.keys().hasAll(['username','biography','pastPlayerReviews','allowCampaignMessages']) && p.keys().hasOnly(['username','biography','pastPlayerReviews','allowCampaignMessages'])
+      return p.keys().hasAll(['username','biography','pastPlayerReviews','allowCampaignMessages']) && p.keys().hasOnly(['username','biography','pastPlayerReviews','allowCampaignMessages','photoURL'])
+        && (!('photoURL' in p) || (p.photoURL is string && (p.photoURL == '' || (p.photoURL.size() <= 90000 && p.photoURL.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')))))
         && p.username is string && p.username.size() > 0 && p.username.size() <= 60
         && p.biography is string && p.biography.size() <= 4000 && p.allowCampaignMessages is bool
         && p.pastPlayerReviews is list && p.pastPlayerReviews.size() <= 20;
@@ -137,7 +138,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if signedIn() && request.auth.uid == userId && profileValid(request.resource.data) && request.resource.data.pastPlayerReviews.size() == 0;
       allow update: if signedIn() && profileValid(request.resource.data) && (
-        (request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','biography','allowCampaignMessages'])) ||
+        (request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','biography','allowCampaignMessages','photoURL'])) ||
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pastPlayerReviews']) && validCacheAppend(userId))
       );
       allow delete: if false;

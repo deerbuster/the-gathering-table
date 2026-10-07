@@ -1,3 +1,4 @@
+import { AvatarComponent } from '../shared/avatar.component';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -8,7 +9,7 @@ import { AuthService } from '../core/auth.service';
 import { CampaignService } from '../core/campaign.service';
 import { friendlyError } from '../core/error';
 
-@Component({ imports: [RouterLink, DatePipe, ReactiveFormsModule], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './profile.component.html' })
+@Component({ imports: [AvatarComponent, RouterLink, DatePipe, ReactiveFormsModule], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './profile.component.html' })
 export class ProfileComponent {
   readonly auth = inject(AuthService);
   private readonly service = inject(CampaignService);
@@ -33,3 +34,4 @@ export class ProfileComponent {
     finally { this.busy.set(false); }
   }
 }
+

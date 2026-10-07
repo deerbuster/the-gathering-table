@@ -19,3 +19,4 @@ The polyfill's transitive `jsbi` dependency produces an Angular CommonJS optimiz
 
 - Applicant browser check: opted-out Alex received an unread inbox alert; opening the GM conversation displayed Application accepted and the welcome feedback, then cleared the badge. No console errors; no horizontal overflow at 390px.
 
+- Profile-picture update: 14 domain and 30 Firestore emulator tests passed. Browser upload/save/public-display verified in an isolated demo; existing opt-out remained false. New registrations default incoming messages to true.

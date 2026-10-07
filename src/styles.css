@@ -174,3 +174,4 @@ input:disabled { background: #eef0ea; color: #798174; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
 .unread-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25rem; height: 1.25rem; padding: 0 .35rem; margin-left: .3rem; border-radius: 999px; background: #9a3412; color: #fff; font-size: .72rem; font-weight: 700; line-height: 1; }
 nav { flex-wrap: wrap; } nav a { white-space: nowrap; }
+.profile-avatar { display: inline-flex; width: 36px; height: 36px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 50%; object-fit: cover; background: #dce6dc; color: #243e32; font-weight: 700; } .profile-avatar.large { width: 88px; height: 88px; font-size: 2rem; }

@@ -12,6 +12,7 @@ import {
 } from './models';
 import { demoCampaigns, demoProfiles } from './demo-data';
 import { localToDate, scheduleDay } from './time';
+import { validProfilePhoto } from './profile-photo';
 
 @Injectable({ providedIn: 'root' })
 export class CampaignService {
@@ -74,19 +75,20 @@ export class CampaignService {
       collection(this.firestore!, 'users', uid, 'reviews'), { idField: 'id' },
     ) as Observable<Review[]>);
   }
-  async saveProfile(username: string, biography: string, uid = this.requireUser(), allowCampaignMessages = false): Promise<void> {
+  async saveProfile(username: string, biography: string, uid = this.requireUser(), allowCampaignMessages = true, photoURL = ''): Promise<void> {
     if (uid !== this.requireUser()) throw new Error('You can only edit your own profile.');
+    if (!validProfilePhoto(photoURL)) throw new Error('Choose a valid profile picture.');
     if (!username.trim() || username.length > 60 || biography.length > 4000) throw new Error('Enter a name of up to 60 characters and a biography of up to 4,000.');
     if (!this.firestore) {
       const old = this.profiles.value[uid];
-      this.profiles.next({ ...this.profiles.value, [uid]: { username: username.trim(), biography, pastPlayerReviews: old?.pastPlayerReviews ?? [], allowCampaignMessages } });
+      this.profiles.next({ ...this.profiles.value, [uid]: { username: username.trim(), biography, pastPlayerReviews: old?.pastPlayerReviews ?? [], allowCampaignMessages, photoURL } });
       return;
     }
     const reference = doc(this.firestore, 'users', uid);
     await runTransaction(this.firestore, async transaction => {
       const snapshot = await transaction.get(reference);
-      if (snapshot.exists()) transaction.update(reference, { username: username.trim(), biography, allowCampaignMessages });
-      else transaction.set(reference, { username: username.trim(), biography, pastPlayerReviews: [], allowCampaignMessages });
+      if (snapshot.exists()) transaction.update(reference, { username: username.trim(), biography, allowCampaignMessages, photoURL });
+      else transaction.set(reference, { username: username.trim(), biography, pastPlayerReviews: [], allowCampaignMessages, photoURL });
     });
   }
   async saveCampaign(input: CampaignInput, existingId?: string): Promise<string> {
@@ -253,3 +255,4 @@ export class CampaignService {
     });
   }
 }
+
