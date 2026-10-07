@@ -23,7 +23,7 @@
         <p class="field-help">Player seats exclude you, the GM. Meeting the minimum makes the table ready for your confirmation.</p>
         <label>Description · Markdown supported<textarea rows="11" formControlName="description" maxlength="20000" required placeholder="The premise, play style, experience level, and how your group will meet. Keep private contact details out of public listings."></textarea></label>
         <label>Campaign background<input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="busy() || backgroundBusy()" (change)="chooseBackground($event)"></label>
-        <p class="field-help">JPG, PNG or WebP, up to 5 MB. Cropped to a wide banner; keep important artwork near the center. Saved when you save the campaign.</p>
+        <p class="field-help">JPG, PNG or WebP, up to 5 MB. The full image is preserved and resized for the web. Saved when you save the campaign.</p>
         @if (backgroundBusy()) { <p role="status">Preparing background…</p> }
         @if (backgroundPreview()) { <img class="campaign-background-preview" [src]="backgroundPreview()" alt="Campaign background preview"><button type="button" class="text-link" [disabled]="busy() || backgroundBusy()" (click)="removeBackground()">Remove background</button> }
       </section>

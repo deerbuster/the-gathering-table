@@ -117,4 +117,4 @@ tests/
 - Paid game is a filterable campaign flag. GMs arrange any charges directly; this app does not process payments.
 
 
-Campaign preparation and artwork: new campaigns default to Preparing (publicly visible but no applications or seat reservations). The GM opens recruitment to move to New; creation can optionally open immediately. Existing tables retain their status. Campaign backgrounds accept JPG/PNG/WebP up to 5 MB, center-crop to 1200 x 400 JPEG, and store an optional bounded backgroundImageURL (300,000 characters maximum). Only the GM can save/remove artwork through the campaign editor.
+Campaign preparation and artwork: new campaigns default to Preparing (publicly visible but no applications or seat reservations). The GM opens recruitment to move to New; creation can optionally open immediately. Existing tables retain their status. Campaign backgrounds accept JPG/PNG/WebP up to 5 MB, preserve the full composition with proportional resizing up to 1600 x 1200 JPEG, and store an optional bounded backgroundImageURL (300,000 characters maximum). Only the GM can save/remove artwork through the campaign editor.

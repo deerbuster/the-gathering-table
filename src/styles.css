@@ -179,8 +179,6 @@ nav { flex-wrap: wrap; } nav a { white-space: nowrap; }
 .card-top { flex-wrap: wrap; } .payment-tag { font-size: .72rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #f6e9cc; color: #624711; }
 
 
-.campaign-background-preview { width: 100%; aspect-ratio: 3 / 1; object-fit: cover; border-radius: 12px; }
-.campaign-hero { position: relative; isolation: isolate; overflow: hidden; padding: 32px; min-height: 240px; border-radius: 18px; background: #16352e; color: white; }
-.campaign-hero-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
-.campaign-hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg,rgba(10,24,21,.88),rgba(10,24,21,.5)); z-index: -1; }
-.campaign-hero .eyebrow, .campaign-hero .intro-copy, .campaign-hero .intro-copy a { color: #fff; }
+.campaign-background-preview { width: 100%; height: auto; max-height: 420px; object-fit: contain; border-radius: 12px; background: #16352e; }
+.campaign-artwork { margin: 12px 0 0; overflow: hidden; border-radius: 18px; background: #16352e; }
+.campaign-artwork img { display: block; width: 100%; height: auto; max-height: 680px; object-fit: contain; }
