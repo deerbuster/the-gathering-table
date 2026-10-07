@@ -20,6 +20,7 @@ export type Frequency = typeof FREQUENCIES[number];
 export type Day = typeof DAYS[number];
 export type LifecycleStatus = 'New' | 'Established' | 'Closed' | 'Completed';
 export interface Campaign extends TableDetails {
+  paid?: boolean;
   id: string;
   name: string;
   systemType: System;
@@ -45,6 +46,7 @@ export interface Campaign extends TableDetails {
   localStartTime: string | null;
 }
 export type CampaignInput = TableDetails & Pick<Campaign, 'name' | 'systemType' | 'minPlayers' | 'maxPlayers' | 'description' | 'sessionLengthHours' | 'frequency' | 'timeZone' | 'startMode'> & {
+  paid: boolean;
   localDateTime: string;
   occurrence: 'reject' | 'earlier' | 'later';
 };
@@ -67,6 +69,7 @@ export interface Profile {
 export interface Identity { uid: string; email: string | null; }
 
 export function validateInput(input: CampaignInput): void {
+  if (typeof input.paid !== 'boolean') throw new Error('Specify whether this is a paid game.');
   if (!['Physical', 'Virtual', 'Theater of the Mind'].includes(input.tableType)) throw new Error('Choose a table type.');
   if (input.tableType === 'Physical' && (!input.location.trim() || input.location.length > 300)) throw new Error('Enter a meeting location of up to 300 characters.');
   if (input.tableType === 'Virtual' && (!input.virtualPlatform || !PLATFORMS.includes(input.virtualPlatform))) throw new Error('Choose a virtual tabletop.');
@@ -82,6 +85,9 @@ export function validateInput(input: CampaignInput): void {
   if (!Number.isInteger(input.minPlayers) || !Number.isInteger(input.maxPlayers) || input.minPlayers < 1 || input.maxPlayers > 20 || input.minPlayers > input.maxPlayers) throw new Error('Choose 1–20 seats, with the minimum no greater than the maximum.');
   if (!Number.isFinite(input.sessionLengthHours) || input.sessionLengthHours < 0.5 || input.sessionLengthHours > 24) throw new Error('Choose a session length between 0.5 and 24 hours.');
   if (!input.description.trim() || input.description.length > 20000) throw new Error('Enter a description of up to 20,000 characters.');
+}
+export function matchesPaymentFilter(campaign: Pick<Campaign, 'paid'>, filter: 'all' | 'free' | 'paid'): boolean {
+  return filter === 'all' || (filter === 'paid' ? campaign.paid === true : campaign.paid !== true);
 }
 export function joinPatch(c: Campaign, uid: string, now = Date.now()): Pick<Campaign, 'playerIds' | 'currentPlayers' | 'status'> {
   if (c.startMode === 'Rolling') throw new Error('This campaign requires GM acceptance. Apply for a seat first.');

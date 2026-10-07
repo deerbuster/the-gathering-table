@@ -34,6 +34,7 @@ export class EditorComponent {
     platformOther: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(100)] }),
     voiceService: new FormControl<TableDetails['voiceService']>('Discord'),
     voiceOther: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(100)] }),
+    paid: new FormControl(false, { nonNullable: true }),
     recorded: new FormControl(false, { nonNullable: true }),
     broadcast: new FormControl(false, { nonNullable: true }),
     name: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(120)] }),
@@ -94,3 +95,4 @@ export class EditorComponent {
     finally { this.loading.set(false); }
   }
 }
+

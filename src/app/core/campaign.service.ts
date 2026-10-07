@@ -107,7 +107,7 @@ export class CampaignService {
       platformOther: input.tableType === 'Virtual' && input.virtualPlatform === 'Other' ? input.platformOther.trim() : '',
       voiceService: input.tableType !== 'Physical' ? input.voiceService : null,
       voiceOther: input.tableType !== 'Physical' && input.voiceService === 'Other' ? input.voiceOther.trim() : '',
-      recorded: input.recorded, broadcast: input.broadcast,
+      recorded: input.recorded, broadcast: input.broadcast, paid: input.paid,
       name: input.name.trim(), systemType: input.systemType,
       minPlayers: input.minPlayers, maxPlayers: input.maxPlayers,
       description: input.description, sessionLengthHours: input.sessionLengthHours,
@@ -255,4 +255,5 @@ export class CampaignService {
     });
   }
 }
+
 

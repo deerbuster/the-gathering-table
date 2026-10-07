@@ -5,7 +5,7 @@ import { Campaign, CampaignInput, joinPatch, leavePatch, validateInput, applyPat
 import { localToDate, dateInZone, scheduleDay } from '../src/app/core/time';
 
 const base: Campaign = {
-  tableType: 'Virtual', location: '', virtualPlatform: 'Fantasy Grounds', platformOther: '', voiceService: 'Discord', voiceOther: '', recorded: false, broadcast: false,
+  tableType: 'Virtual', location: '', virtualPlatform: 'Fantasy Grounds', platformOther: '', voiceService: 'Discord', voiceOther: '', recorded: false, broadcast: false, paid: false,
   id: 'table', name: 'Test table', gmUserId: 'gm', gmName: 'GM', systemType: 'RMU',
   minPlayers: 2, maxPlayers: 3, playerIds: ['a','b'], currentPlayers: 2,
   status: 'Open', scheduleState: 'Confirmed', description: 'Adventure',
@@ -98,4 +98,14 @@ test('profile pictures are bounded JPEG data and reject external URLs and SVG', 
   assert.equal(validProfilePhoto('https://example.com/photo.jpg'), false);
   assert.equal(validProfilePhoto('data:image/svg+xml;base64,AAAA'), false);
   assert.equal(validProfilePhoto('data:image/jpeg;base64,' + 'A'.repeat(90000)), false);
+});
+
+
+test('paid/free filters include legacy free tables and distinguish paid listings', async () => {
+  const { matchesPaymentFilter } = await import('../src/app/core/models');
+  assert.equal(matchesPaymentFilter({}, 'free'), true);
+  assert.equal(matchesPaymentFilter({ paid: false }, 'paid'), false);
+  assert.equal(matchesPaymentFilter({ paid: true }, 'free'), false);
+  assert.equal(matchesPaymentFilter({ paid: true }, 'paid'), true);
+  assert.equal(matchesPaymentFilter({ paid: true }, 'all'), true);
 });

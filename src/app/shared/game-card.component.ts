@@ -9,7 +9,7 @@ import { Campaign } from '../core/models';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <article class="game-card" [attr.data-system]="campaign().systemType">
-      <div class="card-top"><span class="system-tag">{{ campaign().systemType }}</span><span class="status-badge" [class.full]="campaign().status === 'Closed'" [class.completed]="campaign().status === 'Completed'">{{ campaign().lifecycleStatus }}</span></div>
+      <div class="card-top"><span class="system-tag">{{ campaign().systemType }}</span><span class="payment-tag">{{ campaign().paid ? 'Paid' : 'Free' }}</span><span class="status-badge" [class.full]="campaign().status === 'Closed'" [class.completed]="campaign().status === 'Completed'">{{ campaign().lifecycleStatus }}</span></div>
       <div class="card-heading"><span class="table-symbol" aria-hidden="true">{{ symbol() }}</span><h2><a [routerLink]="['/games', campaign().id]">{{ campaign().name }}</a></h2></div>
       <p class="gm-line">Hosted by <a [routerLink]="['/profile', campaign().gmUserId]">{{ campaign().gmName }}</a></p>
       @if (gm() && campaign().pendingPlayerIds.length && campaign().lifecycleStatus !== 'Completed') { <a class="text-link" [routerLink]="['/games', campaign().id]">{{ campaign().pendingPlayerIds.length }} pending {{ campaign().pendingPlayerIds.length === 1 ? 'application' : 'applications' }} <span class="unread-badge" aria-hidden="true">{{ campaign().pendingPlayerIds.length }}</span></a> }
@@ -35,3 +35,4 @@ export class GameCardComponent {
   readonly unavailable = computed(() => this.campaign().status !== 'Open' || (this.campaign().startTime?.toMillis() ?? Infinity) <= Date.now());
   readonly symbol = computed(() => this.campaign().systemType === 'Space Master' ? '✦' : this.campaign().systemType === 'MERP' ? '❧' : '⚔');
 }
+

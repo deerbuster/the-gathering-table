@@ -21,7 +21,7 @@ export function demoCampaigns(): Campaign[] {
     const local = dateInZone(date, zone);
     return {
       id: s[0], name: s[1], systemType: s[2], gmName: s[3],
-      tableType: 'Virtual', location: '', virtualPlatform: 'Fantasy Grounds', platformOther: '', voiceService: 'Discord', voiceOther: '', recorded: false, broadcast: false,
+      tableType: 'Virtual', location: '', virtualPlatform: 'Fantasy Grounds', platformOther: '', voiceService: 'Discord', voiceOther: '', recorded: false, broadcast: false, paid: index === 1,
       gmUserId: index === 0 ? DEMO_GM : `sample-gm-${index}`,
       minPlayers: s[4], maxPlayers: s[5], currentPlayers: s[6],
       playerIds: Array.from({ length: s[6] }, (_, i) => `sample-player-${index}-${i}`), pendingPlayerIds: [],
@@ -44,4 +44,5 @@ export function demoProfiles(): Record<string, Profile> {
     'demo-retired': { username: 'Finch', biography: 'Former player of The Ashen Frontier. Happy to answer questions about the table.', pastPlayerReviews: [], allowCampaignMessages: true },
   };
 }
+
 

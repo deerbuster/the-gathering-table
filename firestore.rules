@@ -17,8 +17,8 @@ service cloud.firestore {
                 && ((c.virtualPlatform == 'Other' && c.platformOther.size() > 0) || (c.virtualPlatform != 'Other' && c.platformOther == ''))))));
     }
     function campaignValid(c) {
-      return tableValid(c) && c.keys().hasAll(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast'])
-        && c.keys().hasOnly(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast'])
+      return (!('paid' in c) || c.paid is bool) && tableValid(c) && c.keys().hasAll(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast'])
+        && c.keys().hasOnly(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast','paid'])
         && c.name is string && c.name.size() > 0 && c.name.size() <= 120
         && c.systemType in ['Rolemaster Classic','RMSS','RMFRP','RMU','Space Master','MERP','HARP']
         && c.gmUserId is string && c.gmName is string && c.gmName.size() > 0 && c.gmName.size() <= 60
@@ -83,7 +83,7 @@ service cloud.firestore {
       return request.auth.uid == old.gmUserId && old.status != 'Completed' && (
         (next.diff(old).affectedKeys().hasOnly(['status','lifecycleStatus']) && (next.lifecycleStatus != 'Established' || next.startTime is timestamp)) ||
         (next.diff(old).affectedKeys().hasOnly(['scheduleState']) && next.scheduleState == 'Confirmed' && next.startTime > request.time) ||
-        (next.diff(old).affectedKeys().hasOnly(['name','systemType','minPlayers','maxPlayers','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','scheduleState','scheduleRevision','status','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast'])
+        (next.diff(old).affectedKeys().hasOnly(['name','systemType','minPlayers','maxPlayers','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','scheduleState','scheduleRevision','status','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast','paid'])
           && next.scheduleState == 'Recruiting' && next.lifecycleStatus == old.lifecycleStatus && next.status != 'Completed'
           && next.scheduleRevision == old.scheduleRevision + 1 && futureOrUnscheduled(next)
           && (old.startTime == null || next.startTime is timestamp)
@@ -92,7 +92,7 @@ service cloud.firestore {
     }
     match /campaigns/{campaignId} {
       allow read: if true;
-      allow create: if signedIn() && campaignValid(request.resource.data)
+      allow create: if signedIn() && campaignValid(request.resource.data) && request.resource.data.paid is bool
         && request.resource.data.gmUserId == request.auth.uid
         && request.resource.data.gmName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
         && request.resource.data.playerIds.size() == 0 && request.resource.data.pendingPlayerIds.size() == 0 && request.resource.data.retiredPlayerIds.size() == 0
@@ -205,4 +205,5 @@ service cloud.firestore {
     }
   }
 }
+
 

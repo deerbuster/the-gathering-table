@@ -96,3 +96,4 @@ Older campaign documents also need the eight meeting-detail fields above. Confir
 
 Profile photoURL is optional for backward compatibility. The uploader accepts JPG/PNG/WebP up to 5 MB, center-crops and re-encodes a 256px JPEG (removing source metadata), and stores a bounded JPEG data URI (90,000 characters maximum) in the profile. Rules allow only the owner to change it; empty removes it. No Storage bucket or external image URL is required. Profiles and active/retired rosters show the picture, with initials on missing or failed images.
 
+- Campaign paid is an optional boolean for legacy compatibility; new documents must explicitly provide it. Missing/false is displayed and filtered as Free, true as Paid. Only the GM can set it through the campaign editor. The finder offers All/Free/Paid with All by default. This metadata does not charge users or handle payment transactions.

@@ -114,3 +114,4 @@ tests/
 
 [AngularFire Firestore](https://github.com/angular/angularfire/blob/main/docs/firestore.md), [Angular DatePipe](https://angular.dev/api/common/DatePipe), [Tailwind Angular setup](https://tailwindcss.com/docs/installation/framework-guides/angular), [Firebase transactions](https://firebase.google.com/docs/firestore/manage-data/transactions), [Firebase rule testing](https://firebase.google.com/docs/firestore/security/test-rules-emulator).
 
+- Paid game is a filterable campaign flag. GMs arrange any charges directly; this app does not process payments.

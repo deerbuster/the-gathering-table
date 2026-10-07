@@ -11,6 +11,7 @@
         <label>Campaign name<input formControlName="name" required maxlength="120" placeholder="The beginning of a good story"></label>
         <label>ICE system<select formControlName="systemType">@for (system of systems; track system) { <option [value]="system">{{ system }}</option> }</select></label>
         <h3>How the table meets</h3>
+        <label class="toggle-label"><input type="checkbox" formControlName="paid"><span>Paid game</span></label><p class="field-help">A listing flag only. Explain any charges in the description and arrange them directly with players. The Gathering Table does not handle payments.</p>
         <label>Table type<select formControlName="tableType"><option value="Physical">Physical · in person</option><option value="Virtual">Virtual · virtual tabletop</option><option value="Theater of the Mind">Theater of the Mind · voice only</option></select></label>
         @if (values().tableType === 'Physical') { <label>Meeting location · public listing<input formControlName="location" required maxlength="300" placeholder="Venue and city, e.g. Central Games, Chicago"></label> }
         @if (values().tableType === 'Virtual') { <label>Virtual tabletop<select formControlName="virtualPlatform">@for (platform of platforms; track platform) { <option [value]="platform">{{ platform }}</option> }</select></label>@if (values().virtualPlatform === 'Other') { <label>Other virtual tabletop<input formControlName="platformOther" required maxlength="100" placeholder="Specify the platform"></label> } }

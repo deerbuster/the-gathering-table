@@ -5,7 +5,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { catchError, combineLatest, map, of, startWith, switchMap } from 'rxjs';
 import { CampaignService } from '../core/campaign.service';
 import { AuthService } from '../core/auth.service';
-import { Campaign, DAYS, SYSTEMS } from '../core/models';
+import { Campaign, DAYS, SYSTEMS, matchesPaymentFilter } from '../core/models';
 import { friendlyError } from '../core/error';
 import { GameCardComponent } from '../shared/game-card.component';
 
@@ -20,7 +20,7 @@ export class FinderComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   readonly requestedView = toSignal(this.route.queryParamMap.pipe(map(params => params.get('view'))));
-  constructor() { effect(() => { if (this.requestedView() === 'applications') { this.filters.reset({ search: '', system: '', day: '', hideFull: false, lifecycle: '' }); this.showMine(false); } }); }
+  constructor() { effect(() => { if (this.requestedView() === 'applications') { this.filters.reset({ search: '', system: '', day: '', hideFull: false, lifecycle: '', payment: 'all' }); this.showMine(false); } }); }
   readonly systems = SYSTEMS;
   readonly days = DAYS;
   readonly timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -33,6 +33,7 @@ export class FinderComponent {
     search: new FormControl('', { nonNullable: true }),
     system: new FormControl('', { nonNullable: true }),
     day: new FormControl('', { nonNullable: true }),
+    payment: new FormControl<'all' | 'free' | 'paid'>('all', { nonNullable: true }),
     hideFull: new FormControl(true, { nonNullable: true }),
     lifecycle: new FormControl('Recruiting', { nonNullable: true }),
   });
@@ -60,11 +61,12 @@ export class FinderComponent {
       (!f.search || `${c.name} ${c.gmName} ${c.description}`.toLowerCase().includes(f.search.toLowerCase())) &&
       (!f.system || c.systemType === f.system) && (!f.day || (f.day === 'TBD' ? c.dayOfWeek === null : c.dayOfWeek === f.day)) &&
       (!f.lifecycle || (f.lifecycle === 'Recruiting' ? ['Open', 'Full'].includes(c.status) : c.lifecycleStatus === f.lifecycle)) &&
+      matchesPaymentFilter(c, f.payment ?? 'all') &&
       (!f.hideFull || c.status !== 'Full'),
     ).sort((a, b) => (a.startTime?.toMillis() ?? Infinity) - (b.startTime?.toMillis() ?? Infinity));
   });
   readonly openCount = computed(() => this.catalog()?.filter(c => c.status === 'Open').length ?? 0);
-  reset(): void { this.filters.reset({ search: '', system: '', day: '', hideFull: true, lifecycle: 'Recruiting' }); }
+  reset(): void { this.filters.reset({ search: '', system: '', day: '', hideFull: true, lifecycle: 'Recruiting', payment: 'all' }); }
   reload(): void { window.location.reload(); }
   async join(c: Campaign): Promise<void> {
     if (!this.auth.user()) { await this.router.navigate(['/account'], { queryParams: { returnTo: `/games/${c.id}` } }); return; }
@@ -75,3 +77,4 @@ export class FinderComponent {
     finally { this.busyId.set(null); }
   }
 }
+

@@ -46,7 +46,7 @@ h2 { font-family: Georgia, serif; font-size: 24px; font-weight: 400; line-height
 .tabs button span { margin-left: 9px; font-size: 12px; font-weight: 500; border-radius: 20px; background: #e4eadc; padding: 3px 8px; color: #45603b; }
 .timezone { color: var(--muted); font-size: 14px; }
 .timezone > span { font-size: 19px; margin-right: 5px; }
-.filter-bar { display: grid; grid-template-columns: minmax(200px, 1.4fr) minmax(120px, 1fr) minmax(110px, .8fr) minmax(140px, 1fr) auto; gap: 16px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; }
+.filter-bar { display: grid; grid-template-columns: minmax(180px, 1.3fr) minmax(120px, 1fr) minmax(110px, .8fr) minmax(130px, 1fr) minmax(110px, .8fr) auto; gap: 16px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; }
 label { display: block; font-size: 14px; font-weight: 600; }
 label > span { display: block; margin-bottom: 8px; }
 input, select, textarea { width: 100%; margin-top: 8px; border: 1px solid #cdd6ca; border-radius: 6px; background: #fff; color: var(--ink); padding: 11px 12px; min-height: 45px; font-size: 15px; font-weight: 400; }
@@ -175,3 +175,6 @@ input:disabled { background: #eef0ea; color: #798174; cursor: not-allowed; }
 .unread-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 1.25rem; height: 1.25rem; padding: 0 .35rem; margin-left: .3rem; border-radius: 999px; background: #9a3412; color: #fff; font-size: .72rem; font-weight: 700; line-height: 1; }
 nav { flex-wrap: wrap; } nav a { white-space: nowrap; }
 .profile-avatar { display: inline-flex; width: 36px; height: 36px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 50%; object-fit: cover; background: #dce6dc; color: #243e32; font-weight: 700; } .profile-avatar.large { width: 88px; height: 88px; font-size: 2rem; }
+
+.card-top { flex-wrap: wrap; } .payment-tag { font-size: .72rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #f6e9cc; color: #624711; }
+

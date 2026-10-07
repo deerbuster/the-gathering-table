@@ -6,7 +6,7 @@ import { doc, setDoc, updateDoc, getDoc, getDocs, collection, query, where, serv
 
 let env;
 const profile = { username: 'Adventurer', biography: '', pastPlayerReviews: [], allowCampaignMessages: false };
-const campaign = () => ({ tableType: 'Virtual', location: '', virtualPlatform: 'Fantasy Grounds', platformOther: '', voiceService: 'Discord', voiceOther: '', recorded: false, broadcast: false, name: 'Test', systemType: 'RMU', gmUserId: 'gm', gmName: 'Adventurer', minPlayers: 2, maxPlayers: 3, currentPlayers: 2, playerIds: ['a','b'], retiredPlayerIds: [], pendingPlayerIds: [], startMode: 'Fixed', lifecycleStatus: 'New', scheduleRevision: 0, status: 'Open', scheduleState: 'Confirmed', description: 'Adventure', dayOfWeek: 'Friday', sessionLengthHours: 3, frequency: 'Weekly', startTime: Timestamp.fromMillis(Date.now() + 86400000), timeZone: 'America/Chicago', localStartTime: '19:00' });
+const campaign = () => ({ tableType: 'Virtual', location: '', virtualPlatform: 'Fantasy Grounds', platformOther: '', voiceService: 'Discord', voiceOther: '', recorded: false, broadcast: false, paid: false, name: 'Test', systemType: 'RMU', gmUserId: 'gm', gmName: 'Adventurer', minPlayers: 2, maxPlayers: 3, currentPlayers: 2, playerIds: ['a','b'], retiredPlayerIds: [], pendingPlayerIds: [], startMode: 'Fixed', lifecycleStatus: 'New', scheduleRevision: 0, status: 'Open', scheduleState: 'Confirmed', description: 'Adventure', dayOfWeek: 'Friday', sessionLengthHours: 3, frequency: 'Weekly', startTime: Timestamp.fromMillis(Date.now() + 86400000), timeZone: 'America/Chicago', localStartTime: '19:00' });
 const db = uid => uid ? env.authenticatedContext(uid).firestore() : env.unauthenticatedContext().firestore();
 const ref = uid => doc(db(uid), 'campaigns', 'table');
 before(async () => { env = await initializeTestEnvironment({ projectId: 'demo-the-gathering-table', firestore: { rules: await readFile(new URL('../firestore.rules', import.meta.url), 'utf8') } }); });
@@ -283,4 +283,15 @@ test('owners can add/remove bounded profile pictures without changing message pr
   await assertFails(updateDoc(own, { photoURL: 'data:image/jpeg;base64,' + 'A'.repeat(90000) }));
   await assertSucceeds(updateDoc(own, { photoURL: '' }));
   await assertSucceeds(setDoc(doc(db('new-player'), 'users', 'new-player'), { ...profile, allowCampaignMessages: true, photoURL: '' }));
+});
+
+
+test('paid is a boolean flag controlled by the GM; legacy campaigns remain readable and editable', async () => {
+  await assertFails(updateDoc(ref('a'), { paid: true }));
+  await assertFails(updateDoc(ref('gm'), { paid: 'yes', scheduleState: 'Recruiting', scheduleRevision: 1 }));
+  await assertSucceeds(updateDoc(ref('gm'), { paid: true, scheduleState: 'Recruiting', scheduleRevision: 1 }));
+  await assertSucceeds(updateDoc(ref('gm'), { paid: false, scheduleRevision: 2 }));
+  await env.withSecurityRulesDisabled(async ctx => { const c = campaign(); delete c.paid; await setDoc(doc(ctx.firestore(), 'campaigns', 'table'), c); });
+  await assertSucceeds(getDoc(ref(null)));
+  await assertSucceeds(updateDoc(ref('c'), { playerIds: ['a','b','c'], currentPlayers: 3, status: 'Full' }));
 });
