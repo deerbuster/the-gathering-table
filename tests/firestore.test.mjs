@@ -311,3 +311,17 @@ test('campaign background changes are GM-only and bounded', async () => {
   await assertSucceeds(updateDoc(ref('gm'), { backgroundImageURL: 'data:image/jpeg;base64,YQ==', scheduleState: 'Recruiting', scheduleRevision: 1 }));
   await assertFails(updateDoc(ref('gm'), { status: 'Preparing', lifecycleStatus: 'Preparing' }));
 });
+test('GM can save campaign tags and content guidance; members cannot edit them', async () => {
+  const preferences = { tags: ['Newbie friendly','Horror','Session zero'], playerAge: '18+', contentRating: 'M', contentNotes: 'Frightening scenes; discuss boundaries with the GM.', scheduleState: 'Recruiting', scheduleRevision: 1 };
+  await assertFails(updateDoc(ref('a'), preferences));
+  await assertSucceeds(updateDoc(ref('gm'), preferences));
+  await assertSucceeds(updateDoc(ref('c'), { playerIds: ['a','b','c'], currentPlayers: 3, status: 'Full' }));
+  const c = (await getDoc(ref(null))).data();
+  assert.equal(c.contentRating, 'M'); assert.deepEqual(c.tags, preferences.tags);
+});
+test('invalid or duplicate campaign tags and invalid content guidance are denied', async () => {
+  for (const invalid of [{ tags: ['Unknown'] }, { tags: ['Casual','Casual'] }, { tags: 'Casual' }, { contentRating: 'X' }, { playerAge: '12+' }, { contentNotes: 'A'.repeat(2001) }]) {
+    await assertFails(updateDoc(ref('gm'), { ...invalid, scheduleState: 'Recruiting', scheduleRevision: 1 }));
+  }
+  await assertSucceeds(updateDoc(ref('gm'), { tags: [], contentRating: '', playerAge: '', contentNotes: '', scheduleState: 'Recruiting', scheduleRevision: 1 }));
+});

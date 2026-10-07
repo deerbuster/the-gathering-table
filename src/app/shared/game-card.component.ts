@@ -1,3 +1,4 @@
+import { CampaignPreferencesComponent } from './campaign-preferences.component';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
@@ -5,7 +6,7 @@ import { Campaign } from '../core/models';
 
 @Component({
   selector: 'app-game-card',
-  imports: [DatePipe, RouterLink],
+  imports: [CampaignPreferencesComponent, DatePipe, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <article class="game-card" [attr.data-system]="campaign().systemType">
@@ -13,7 +14,7 @@ import { Campaign } from '../core/models';
       <div class="card-heading"><span class="table-symbol" aria-hidden="true">{{ symbol() }}</span><h2><a [routerLink]="['/games', campaign().id]">{{ campaign().name }}</a></h2></div>
       <p class="gm-line">Hosted by <a [routerLink]="['/profile', campaign().gmUserId]">{{ campaign().gmName }}</a></p>
       @if (gm() && campaign().pendingPlayerIds.length && campaign().lifecycleStatus !== 'Completed') { <a class="text-link" [routerLink]="['/games', campaign().id]">{{ campaign().pendingPlayerIds.length }} pending {{ campaign().pendingPlayerIds.length === 1 ? 'application' : 'applications' }} <span class="unread-badge" aria-hidden="true">{{ campaign().pendingPlayerIds.length }}</span></a> }
-      <p class="card-description line-clamp-2">{{ excerpt() }}</p>
+      <app-campaign-preferences [campaign]="campaign()" [compact]="true"/><p class="card-description line-clamp-2">{{ excerpt() }}</p>
       <p class="field-help">{{ campaign().tableType }} · {{ campaign().tableType === 'Physical' ? campaign().location : campaign().tableType === 'Virtual' ? (campaign().virtualPlatform === 'Other' ? campaign().platformOther : campaign().virtualPlatform) : (campaign().voiceService === 'Other' ? campaign().voiceOther : campaign().voiceService) }}@if (campaign().recorded) { · Recorded }@if (campaign().broadcast) { · Broadcast }</p>
       <div class="card-schedule"><div><span class="meta-label">{{ campaign().startTime ? 'NEXT SESSION · YOUR TIME' : 'ROLLING START' }}</span>@if (campaign().startTime; as start) { <strong>{{ start.toDate() | date:'EEE, MMM d' }}</strong><span>{{ start.toDate() | date:'shortTime' }} · {{ campaign().sessionLengthHours }} hrs</span> } @else { <strong>Date to be decided</strong><span>Scheduled after {{ campaign().minPlayers }} players are accepted</span> }</div><span class="frequency">{{ campaign().frequency }}</span></div>
       <div class="seat-label"><span><strong>{{ campaign().currentPlayers }}</strong> / {{ campaign().maxPlayers }} {{ campaign().startMode === 'Rolling' ? 'accepted' : 'player seats' }}</span><span>Min. {{ campaign().minPlayers }}</span></div>

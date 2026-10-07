@@ -21,3 +21,5 @@ The polyfill's transitive `jsbi` dependency produces an Angular CommonJS optimiz
 
 - Profile-picture update: 14 domain and 30 Firestore emulator tests passed. Browser upload/save/public-display verified in an isolated demo; existing opt-out remained false. New registrations default incoming messages to true.
 - Paid flag: 15 domain and 31 emulator tests pass. Paid-only demo search returns one table; Free-only returns four non-full tables; All restores both. Mobile filter width verified at 390px with no overflow. Legacy campaign reads and membership changes remain valid.
+
+- Campaign tags: 19 domain and 35 Firestore emulator tests pass. Coverage includes combined filters, legacy missing metadata, duplicate/invented tags, invalid age/rating, bounded notes, GM-only updates and membership writes preserving tags.

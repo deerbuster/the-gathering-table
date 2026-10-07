@@ -100,3 +100,6 @@ Profile photoURL is optional for backward compatibility. The uploader accepts JP
 
 
 Campaign preparation and artwork: new campaigns default to Preparing (publicly visible but no applications or seat reservations). The GM opens recruitment to move to New; creation can optionally open immediately. Existing tables retain their status. Campaign backgrounds accept JPG/PNG/WebP up to 5 MB, preserve the full composition with proportional resizing up to 1600 x 1200 JPEG, and store an optional bounded backgroundImageURL (300,000 characters maximum). Only the GM can save/remove artwork through the campaign editor.
+
+
+Campaign preferences: optional tags (21 allowlisted values across seven groups), playerAge (All ages / 16+ / 18+), contentRating (E / E10+ / T / M / AO), and contentNotes (2,000 characters). Empty or absent age/rating means not specified. All metadata is GM-authored, publicly readable, and validated by Firestore rules. Finder filters combine newbie-friendly, play style, exact age requirement and exact rating; missing metadata never implies eligibility. Age guidance does not perform age verification.

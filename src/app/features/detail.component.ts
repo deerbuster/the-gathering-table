@@ -1,3 +1,4 @@
+import { CampaignPreferencesComponent } from '../shared/campaign-preferences.component';
 import { AvatarComponent } from '../shared/avatar.component';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
@@ -13,7 +14,7 @@ import { LifecycleStatus } from '../core/models';
 import { MessageService } from '../core/message.service';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 
-@Component({ imports: [AvatarComponent, RouterLink, DatePipe, ReactiveFormsModule], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './detail.component.html' })
+@Component({ imports: [CampaignPreferencesComponent, AvatarComponent, RouterLink, DatePipe, ReactiveFormsModule], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './detail.component.html' })
 export class DetailComponent {
   readonly auth = inject(AuthService);
   private readonly service = inject(CampaignService);

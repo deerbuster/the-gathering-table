@@ -102,6 +102,7 @@ export class CampaignService {
       : this.profiles.value[uid];
     if (!profile) throw new Error('Create your player profile before hosting a campaign.');
     const scheduling = {
+      tags: input.tags ?? [], playerAge: input.playerAge ?? '', contentRating: input.contentRating ?? '', contentNotes: input.contentNotes?.trim() ?? '',
       backgroundImageURL: input.backgroundImageURL ?? '',
       tableType: input.tableType,
       location: input.tableType === 'Physical' ? input.location.trim() : '',

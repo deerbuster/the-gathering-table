@@ -22,6 +22,13 @@
         <div class="two-columns"><label>Minimum players<input type="number" min="1" max="20" step="1" formControlName="minPlayers" required></label><label>Maximum players<input type="number" min="1" max="20" step="1" formControlName="maxPlayers" required></label></div>
         <p class="field-help">Player seats exclude you, the GM. Meeting the minimum makes the table ready for your confirmation.</p>
         <label>Description · Markdown supported<textarea rows="11" formControlName="description" maxlength="20000" required placeholder="The premise, play style, experience level, and how your group will meet. Keep private contact details out of public listings."></textarea></label>
+        <h3>Who this table welcomes</h3>
+        <label>Player age requirement<select formControlName="playerAge"><option value="">Not specified</option>@for (age of playerAges; track age) { <option [value]="age">{{ age }}</option> }</select></label>
+        <label>Content rating<select formControlName="contentRating"><option value="">Not specified</option>@for (rating of ratings; track rating.value) { <option [value]="rating.value">{{ rating.value }} · {{ rating.label }}</option> }</select></label>
+        <p class="field-help">GM-selected content guidance. Player age is a separate requirement.</p>
+        @for (rating of ratings; track rating.value) { @if (values().contentRating === rating.value) { <p class="time-preview">{{ rating.description }}</p> } }
+        @for (group of tagGroups; track group.name) { <fieldset class="tag-group"><legend>{{ group.name }}</legend><div class="tag-options">@for (tag of group.tags; track tag) { <label class="toggle-label"><input type="checkbox" [checked]="(values().tags ?? []).includes(tag)" (change)="toggleTag(tag, $event)"><span>{{ tag }}</span></label> }</div></fieldset> }
+        <label>Content notes · optional<textarea formControlName="contentNotes" rows="3" maxlength="2000" placeholder="Explain themes, boundaries, and anything players should discuss before joining."></textarea></label>
         <label>Campaign background<input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="busy() || backgroundBusy()" (change)="chooseBackground($event)"></label>
         <p class="field-help">JPG, PNG or WebP, up to 5 MB. The full image is preserved and resized for the web. Saved when you save the campaign.</p>
         @if (backgroundBusy()) { <p role="status">Preparing background…</p> }

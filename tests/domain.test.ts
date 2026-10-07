@@ -121,3 +121,22 @@ test('campaign backgrounds allow bounded JPEG data only', () => {
   assert.equal(validCampaignBackground('https://example.com/image.jpg'), false);
   assert.equal(validCampaignBackground('data:image/jpeg;base64,' + 'A'.repeat(300000)), false);
 });
+import { matchesPreferences, validatePreferences } from '../src/app/core/campaign-preferences';
+test('preference filters distinguish missing metadata and combine selected constraints', () => {
+  const value = { tags: ['Newbie friendly','Roleplay focused'], playerAge: '18+', contentRating: 'T' };
+  assert.equal(matchesPreferences({}, {}), true);
+  assert.equal(matchesPreferences({}, { newbie: true }), false);
+  assert.equal(matchesPreferences({}, { contentRating: 'E' }), false);
+  assert.equal(matchesPreferences(value, { newbie: true, playStyle: 'Roleplay focused', playerAge: '18+', contentRating: 'T' }), true);
+  assert.equal(matchesPreferences(value, { playStyle: 'Combat focused' }), false);
+  assert.equal(matchesPreferences(value, { contentRating: 'M' }), false);
+});
+test('campaign preferences reject invented tags, duplicate tags and invalid ratings', () => {
+  assert.doesNotThrow(() => validatePreferences({}));
+  assert.doesNotThrow(() => validatePreferences({ tags: ['Session zero'], playerAge: '18+', contentRating: 'AO', contentNotes: 'Discuss boundaries.' }));
+  assert.throws(() => validatePreferences({ tags: ['Invented'] }));
+  assert.throws(() => validatePreferences({ tags: ['Casual','Casual'] }));
+  assert.throws(() => validatePreferences({ playerAge: '12+' }));
+  assert.throws(() => validatePreferences({ contentRating: 'X' }));
+  assert.throws(() => validatePreferences({ contentNotes: 'A'.repeat(2001) }));
+});

@@ -1,0 +1,14 @@
+export const TAG_GROUPS = [{"name": "Experience welcome", "tags": ["Newbie friendly", "System beginners welcome", "Experienced players preferred"]}, {"name": "Play style", "tags": ["Roleplay focused", "Combat focused", "Exploration focused", "Balanced"]}, {"name": "Tone", "tags": ["Lighthearted", "Heroic", "Gritty", "Horror"]}, {"name": "Commitment", "tags": ["Casual", "Regular attendance expected"]}, {"name": "Character creation", "tags": ["Pregenerated characters available", "GM helps with character creation"]}, {"name": "Content advisories", "tags": ["Graphic violence", "Sexual themes", "Substance use", "Disturbing themes"]}, {"name": "Table practices", "tags": ["Session zero", "Safety tools used"]}] as const;
+export const CAMPAIGN_TAGS = TAG_GROUPS.flatMap(group => [...group.tags]);
+export const CONTENT_RATINGS = [{"value": "E", "label": "Everyone", "description": "Mild adventure content; no explicit sexual content or graphic violence."}, {"value": "E10+", "label": "Everyone 10+", "description": "Some fantasy violence or mildly frightening scenes."}, {"value": "T", "label": "Teen", "description": "Violence, stronger language or suggestive themes."}, {"value": "M", "label": "Mature", "description": "Intense violence, strong language or sexual themes."}, {"value": "AO", "label": "Adults only", "description": "Explicit adult content; discuss boundaries with the GM before joining."}] as const;
+export const PLAYER_AGES = ["All ages", "16+", "18+"] as const;
+export interface CampaignPreferences { tags?: string[]; playerAge?: string; contentRating?: string; contentNotes?: string; }
+export function validatePreferences(value: CampaignPreferences): void {
+  if (value.tags !== undefined && (!Array.isArray(value.tags) || value.tags.length > CAMPAIGN_TAGS.length || new Set(value.tags).size !== value.tags.length || value.tags.some(tag => !CAMPAIGN_TAGS.includes(tag as typeof CAMPAIGN_TAGS[number])))) throw new Error("Choose tags from the available list without duplicates.");
+  if (value.playerAge && !PLAYER_AGES.includes(value.playerAge as typeof PLAYER_AGES[number])) throw new Error("Choose a player age requirement.");
+  if (value.contentRating && !CONTENT_RATINGS.some(rating => rating.value === value.contentRating)) throw new Error("Choose a content rating.");
+  if (value.contentNotes !== undefined && (typeof value.contentNotes !== "string" || value.contentNotes.length > 2000)) throw new Error("Content notes must be at most 2,000 characters.");
+}
+export function matchesPreferences(value: CampaignPreferences, filters: { newbie?: boolean; playStyle?: string; playerAge?: string; contentRating?: string }): boolean {
+  return (!filters.newbie || (value.tags ?? []).includes("Newbie friendly")) && (!filters.playStyle || (value.tags ?? []).includes(filters.playStyle)) && (!filters.playerAge || value.playerAge === filters.playerAge) && (!filters.contentRating || value.contentRating === filters.contentRating);
+}

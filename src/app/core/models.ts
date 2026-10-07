@@ -1,3 +1,4 @@
+import { CampaignPreferences, validatePreferences } from './campaign-preferences';
 import { Timestamp } from 'firebase/firestore';
 
 export const SYSTEMS = ['Rolemaster Classic', 'RMSS', 'RMFRP', 'RMU', 'Space Master', 'MERP', 'HARP'] as const;
@@ -19,7 +20,7 @@ export type System = typeof SYSTEMS[number];
 export type Frequency = typeof FREQUENCIES[number];
 export type Day = typeof DAYS[number];
 export type LifecycleStatus = 'Preparing' | 'New' | 'Established' | 'Closed' | 'Completed';
-export interface Campaign extends TableDetails {
+export interface Campaign extends TableDetails, CampaignPreferences {
   backgroundImageURL?: string;
   paid?: boolean;
   id: string;
@@ -46,7 +47,7 @@ export interface Campaign extends TableDetails {
   timeZone: string;
   localStartTime: string | null;
 }
-export type CampaignInput = TableDetails & Pick<Campaign, 'name' | 'systemType' | 'minPlayers' | 'maxPlayers' | 'description' | 'sessionLengthHours' | 'frequency' | 'timeZone' | 'startMode'> & {
+export type CampaignInput = TableDetails & CampaignPreferences & Pick<Campaign, 'name' | 'systemType' | 'minPlayers' | 'maxPlayers' | 'description' | 'sessionLengthHours' | 'frequency' | 'timeZone' | 'startMode'> & {
   paid: boolean;
   openRecruitment?: boolean;
   backgroundImageURL?: string;
@@ -72,6 +73,7 @@ export interface Profile {
 export interface Identity { uid: string; email: string | null; }
 
 export function validateInput(input: CampaignInput): void {
+  validatePreferences(input);
   if (typeof input.paid !== 'boolean') throw new Error('Specify whether this is a paid game.');
   if (!['Physical', 'Virtual', 'Theater of the Mind'].includes(input.tableType)) throw new Error('Choose a table type.');
   if (input.tableType === 'Physical' && (!input.location.trim() || input.location.length > 300)) throw new Error('Enter a meeting location of up to 300 characters.');

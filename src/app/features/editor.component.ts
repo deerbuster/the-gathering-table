@@ -1,3 +1,4 @@
+import { TAG_GROUPS, CONTENT_RATINGS, PLAYER_AGES } from '../core/campaign-preferences';
 import { prepareCampaignBackground } from '../core/profile-photo';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -17,6 +18,9 @@ export class EditorComponent {
   private readonly service = inject(CampaignService);
   private readonly router = inject(Router);
   readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id');
+  readonly tagGroups = TAG_GROUPS;
+  readonly ratings = CONTENT_RATINGS;
+  readonly playerAges = PLAYER_AGES;
   readonly systems = SYSTEMS;
   readonly frequencies = FREQUENCIES;
   readonly platforms = PLATFORMS;
@@ -31,6 +35,10 @@ export class EditorComponent {
   readonly acceptedPlayers = signal(0);
   readonly alreadyScheduled = signal(false);
   readonly form = new FormGroup({
+    tags: new FormControl<string[]>([], { nonNullable: true }),
+    playerAge: new FormControl('', { nonNullable: true }),
+    contentRating: new FormControl('', { nonNullable: true }),
+    contentNotes: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(2000)] }),
     openRecruitment: new FormControl(false, { nonNullable: true }),
     backgroundImageURL: new FormControl('', { nonNullable: true }),
     tableType: new FormControl<TableDetails['tableType']>('Virtual', { nonNullable: true }),
@@ -88,6 +96,10 @@ export class EditorComponent {
     try { const id = await this.service.saveCampaign(this.form.getRawValue() as CampaignInput, this.id ?? undefined); await this.router.navigate(['/games', id]); }
     catch (error) { this.message.set(friendlyError(error)); }
     finally { this.busy.set(false); }
+  }
+  toggleTag(tag: string, event: Event): void {
+    const selected = this.form.controls.tags.value;
+    this.form.controls.tags.setValue((event.target as HTMLInputElement).checked ? [...new Set([...selected, tag])] : selected.filter(value => value !== tag));
   }
   async chooseBackground(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement; const file = input.files?.[0]; if (!file) return;

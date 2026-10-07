@@ -11,6 +11,12 @@
 
   <label><span>Payment</span><select formControlName="payment"><option value="all">All games</option><option value="free">Free games</option><option value="paid">Paid games</option></select></label>
   <label class="toggle-label"><input type="checkbox" role="switch" formControlName="hideFull"><span>Hide full games</span></label>
+  <details class="preference-filters"><summary>Player preferences &amp; content</summary><div class="preference-filter-grid">
+    <label class="toggle-label"><input type="checkbox" formControlName="newbie"><span>Newbie friendly only</span></label>
+    <label><span>Play style</span><select formControlName="playStyle"><option value="">Any play style</option>@for (style of playStyles; track style) { <option [value]="style">{{ style }}</option> }</select></label>
+    <label><span>Player age requirement</span><select formControlName="playerAge"><option value="">Any age requirement</option>@for (age of playerAges; track age) { <option [value]="age">{{ age }}</option> }</select></label>
+    <label><span>Content rating</span><select formControlName="contentRating"><option value="">Any content rating</option>@for (rating of ratings; track rating.value) { <option [value]="rating.value">{{ rating.value }} · {{ rating.label }}</option> }</select></label>
+  </div><p class="field-help">Ratings are GM-selected. A specific filter excludes tables where that information has not been supplied.</p></details>
 </form>
 <p class="filter-note">Day filters follow the GM’s timezone. Session dates and times below follow yours.</p>
 @if (message()) { <p class="notice" role="status">{{ message() }}</p> }
