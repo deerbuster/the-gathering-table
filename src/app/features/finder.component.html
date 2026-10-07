@@ -1,0 +1,29 @@
+<div class="page-intro">
+  <div><p class="eyebrow">THE ADVENTURE STARTS WITH A TABLE</p><h1>Find your company.</h1><p class="intro-copy">A place for Rolemaster, Middle-earth, and worlds beyond.</p></div>
+  <a routerLink="/host" class="button primary">Host a campaign <span aria-hidden="true">＋</span></a>
+</div>
+<div class="finder-overview"><div class="tabs" role="group" aria-label="Campaign view"><button type="button" [class.selected]="view() === 'all'" [attr.aria-pressed]="view() === 'all'" (click)="showAll()">Find games <span>{{ openCount() }} open</span></button><button type="button" [class.selected]="view() === 'mine'" [attr.aria-pressed]="view() === 'mine'" (click)="showMine()">My tables</button></div><span class="timezone"><span aria-hidden="true">◷</span> Times in {{ timeZone }}</span></div>
+<form class="filter-bar" [formGroup]="filters" (submit)="$event.preventDefault()" aria-label="Find games filters">
+  <label class="search-field"><span>Search campaigns</span><input formControlName="search" type="search" placeholder="A campaign, a GM, a new adventure…"></label>
+  <label><span>ICE system</span><select formControlName="system"><option value="">All systems</option>@for (system of systems; track system) { <option [value]="system">{{ system }}</option> }</select></label>
+  <label><span>GM schedule day</span><select formControlName="day"><option value="">Any day</option><option value="TBD">To be decided</option>@for (day of days; track day) { <option [value]="day">{{ day }}</option> }</select></label>
+  <label><span>Campaign status</span><select formControlName="lifecycle"><option value="Recruiting">Recruiting tables</option><option value="">All statuses</option><option value="New">New</option><option value="Established">Established</option><option value="Closed">Closed</option><option value="Completed">Completed</option></select></label>
+  <label class="toggle-label"><input type="checkbox" role="switch" formControlName="hideFull"><span>Hide full games</span></label>
+</form>
+<p class="filter-note">Day filters follow the GM’s timezone. Session dates and times below follow yours.</p>
+@if (message()) { <p class="notice" role="status">{{ message() }}</p> }
+@if (error() || (view() === 'mine' && mineError())) {
+  <div class="empty-state" role="alert"><h2>We couldn’t load the tables.</h2><p>{{ error() || mineError() }}</p><button type="button" class="button secondary" (click)="reload()">Try again</button></div>
+} @else if (view() === 'mine' && !auth.user()) {
+  <div class="empty-state"><h2>Your company is waiting.</h2><p>Sign in to see the campaigns you host and the tables you’ve joined.</p><a routerLink="/account" class="button primary">{{ auth.demo ? 'Try a demo identity' : 'Sign in' }}</a></div>
+} @else if (catalog() === undefined || (view() === 'mine' && myGames() === undefined)) {
+  <div class="empty-state" role="status">Gathering the tables…</div>
+} @else {
+  <div class="results-label"><span>{{ results().length }} {{ results().length === 1 ? 'campaign' : 'campaigns' }} {{ view() === 'mine' ? 'at your tables' : 'to explore' }}</span><span>Next session first</span></div>
+  <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+    @for (campaign of results(); track campaign.id) { <app-game-card [campaign]="campaign" [uid]="auth.user()?.uid ?? null" [busy]="busyId() === campaign.id" (join)="join($event)" /> }
+    @empty { <div class="empty-state col-span-full"><h2>No tables match just yet.</h2><p>Try a different system or day, or show full games.</p><button type="button" class="button secondary" (click)="reset()">Clear filters</button></div> }
+  </div>
+}
+<aside class="finder-bottom"><span class="decorative-star" aria-hidden="true">✦</span><p><strong>Every good story needs a company.</strong><br>New to a system? Check the campaign description and find a welcoming table.</p><a routerLink="/host" class="text-link">Make room for an adventure →</a></aside>
+

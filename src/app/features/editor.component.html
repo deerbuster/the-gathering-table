@@ -1,0 +1,39 @@
+<a routerLink="/games" class="text-link">← Back to the tables</a>
+<div class="page-intro"><div><p class="eyebrow">MAKE ROOM FOR AN ADVENTURE</p><h1>{{ id ? 'Manage your campaign.' : 'Host a new table.' }}</h1><p class="intro-copy">Set the story, the seats, and the next session.</p></div></div>
+@if (!auth.user()) {
+  <div class="empty-state"><h2>A name before an adventure.</h2><p>Sign in and create your player profile to host a campaign.</p><a routerLink="/account" [queryParams]="{ returnTo: '/host' }" class="button primary">{{ auth.demo ? 'Try a demo identity' : 'Sign in' }}</a></div>
+} @else if (loading()) { <p role="status">Loading your campaign…</p> }
+@else {
+  @if (message()) { <p class="notice" role="alert">{{ message() }}</p> }
+  @if (!blocked()) {
+    <form [formGroup]="form" (ngSubmit)="submit()" class="editor-grid">
+      <section class="panel form-stack"><h2>The campaign</h2>
+        <label>Campaign name<input formControlName="name" required maxlength="120" placeholder="The beginning of a good story"></label>
+        <label>ICE system<select formControlName="systemType">@for (system of systems; track system) { <option [value]="system">{{ system }}</option> }</select></label>
+        <h3>How the table meets</h3>
+        <label>Table type<select formControlName="tableType"><option value="Physical">Physical · in person</option><option value="Virtual">Virtual · virtual tabletop</option><option value="Theater of the Mind">Theater of the Mind · voice only</option></select></label>
+        @if (values().tableType === 'Physical') { <label>Meeting location · public listing<input formControlName="location" required maxlength="300" placeholder="Venue and city, e.g. Central Games, Chicago"></label> }
+        @if (values().tableType === 'Virtual') { <label>Virtual tabletop<select formControlName="virtualPlatform">@for (platform of platforms; track platform) { <option [value]="platform">{{ platform }}</option> }</select></label>@if (values().virtualPlatform === 'Other') { <label>Other virtual tabletop<input formControlName="platformOther" required maxlength="100" placeholder="Specify the platform"></label> } }
+        @if (values().tableType !== 'Physical') { <label>Voice service<select formControlName="voiceService">@for (service of voiceServices; track service) { <option [value]="service">{{ service }}</option> }</select></label>@if (values().voiceService === 'Other') { <label>Other voice service<input formControlName="voiceOther" required maxlength="100" placeholder="Specify the voice service"></label> } }
+        <label class="toggle-label"><input type="checkbox" formControlName="recorded"><span>Sessions are recorded</span></label>
+        <label class="toggle-label"><input type="checkbox" formControlName="broadcast"><span>Sessions are broadcast or streamed</span></label>
+        <div class="two-columns"><label>Minimum players<input type="number" min="1" max="20" step="1" formControlName="minPlayers" required></label><label>Maximum players<input type="number" min="1" max="20" step="1" formControlName="maxPlayers" required></label></div>
+        <p class="field-help">Player seats exclude you, the GM. Meeting the minimum makes the table ready for your confirmation.</p>
+        <label>Description · Markdown supported<textarea rows="11" formControlName="description" maxlength="20000" required placeholder="The premise, play style, experience level, and how your group will meet. Keep private contact details out of public listings."></textarea></label>
+      </section>
+      <section class="panel form-stack"><h2>The next session</h2>
+        @if (!id) { <label>First-session start policy<select formControlName="startMode"><option value="Rolling">Rolling start · schedule after players are accepted</option><option value="Fixed">Fixed start · publish a date now</option></select></label> } @else { <p class="field-help">{{ rolling() ? 'Rolling start · players need GM acceptance' : 'Fixed start · players reserve seats directly' }}</p> }
+        @if (schedulingLocked()) { <div class="time-preview"><strong>Recruit first, schedule when ready.</strong><p class="field-help">{{ acceptedPlayers() }} players accepted. The first session can be scheduled after the minimum is met. Publish this campaign without a date.</p></div> }
+        <label>Campaign timezone<input formControlName="timeZone" list="timezones" required placeholder="America/Chicago"><datalist id="timezones">@for (zone of zones; track zone) { <option [value]="zone"></option> }</datalist></label>
+        <label>{{ rolling() && !alreadyScheduled() ? 'First session date · optional until ready' : 'Next session date and start time' }}<input type="datetime-local" formControlName="localDateTime" [required]="!rolling() || alreadyScheduled()"></label>
+        <label>Repeated daylight-saving hour<select formControlName="occurrence"><option value="reject">Ask me if the hour occurs twice</option><option value="earlier">Use the earlier occurrence</option><option value="later">Use the later occurrence</option></select></label>
+        <p class="field-help">Times that do not exist during a clock change cannot be scheduled.</p>
+        @if (preview(); as date) { <div class="time-preview"><span class="meta-label">IN YOUR BROWSER’S LOCAL TIME</span><strong>{{ date | date:'medium' }}</strong></div> }
+        <div class="two-columns"><label>Session length · hours<input type="number" min="0.5" max="24" step="0.5" formControlName="sessionLengthHours" required></label><label>Frequency<select formControlName="frequency">@for (frequency of frequencies; track frequency) { <option [value]="frequency">{{ frequency }}</option> }</select></label></div>
+        <p class="field-help">The date sets the next session and its weekday. The GM can change the day, time, timezone, and frequency later to suit the group. Set each next session explicitly so holidays and clock changes never silently move your table.</p>
+        @if (id) { <p class="field-help">Saving scheduling changes clears GM confirmation. Confirm the updated session from the campaign page.</p> }
+        <button class="button primary" [disabled]="busy() || form.invalid">{{ busy() ? 'Saving…' : id ? 'Save campaign' : 'Publish campaign' }}</button>
+      </section>
+    </form>
+  }
+}

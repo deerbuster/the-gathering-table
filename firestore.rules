@@ -1,0 +1,207 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function futureOrUnscheduled(c) { return c.startTime == null || c.startTime > request.time; }
+    function tableValid(c) {
+      return c.tableType in ['Physical','Virtual','Theater of the Mind']
+        && c.location is string && c.location.size() <= 300
+        && c.platformOther is string && c.platformOther.size() <= 100
+        && c.voiceOther is string && c.voiceOther.size() <= 100
+        && c.recorded is bool && c.broadcast is bool
+        && ((c.tableType == 'Physical' && c.location.size() > 0 && c.virtualPlatform == null && c.voiceService == null && c.platformOther == '' && c.voiceOther == '')
+          || (c.tableType != 'Physical' && c.location == '' && c.voiceService in ['Discord','Zoom','Google Meet','Microsoft Teams','Other']
+            && ((c.voiceService == 'Other' && c.voiceOther.size() > 0) || (c.voiceService != 'Other' && c.voiceOther == ''))
+            && ((c.tableType == 'Theater of the Mind' && c.virtualPlatform == null && c.platformOther == '')
+              || (c.tableType == 'Virtual' && c.virtualPlatform in ['Fantasy Grounds','FoundryVTT','Roll20','Other']
+                && ((c.virtualPlatform == 'Other' && c.platformOther.size() > 0) || (c.virtualPlatform != 'Other' && c.platformOther == ''))))));
+    }
+    function campaignValid(c) {
+      return tableValid(c) && c.keys().hasAll(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast'])
+        && c.keys().hasOnly(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast'])
+        && c.name is string && c.name.size() > 0 && c.name.size() <= 120
+        && c.systemType in ['Rolemaster Classic','RMSS','RMFRP','RMU','Space Master','MERP','HARP']
+        && c.gmUserId is string && c.gmName is string && c.gmName.size() > 0 && c.gmName.size() <= 60
+        && c.minPlayers is int && c.maxPlayers is int && c.minPlayers >= 1 && c.maxPlayers <= 20 && c.minPlayers <= c.maxPlayers
+        && c.currentPlayers is int && c.currentPlayers >= 0 && c.currentPlayers <= c.maxPlayers
+        && c.playerIds is list && c.playerIds.size() == c.currentPlayers && c.playerIds.toSet().size() == c.playerIds.size()
+        && c.pendingPlayerIds is list && c.pendingPlayerIds.size() <= 50 && c.pendingPlayerIds.toSet().size() == c.pendingPlayerIds.size()
+        && !c.pendingPlayerIds.hasAny(c.playerIds)
+        && c.retiredPlayerIds is list && c.retiredPlayerIds.size() <= 500 && c.retiredPlayerIds.toSet().size() == c.retiredPlayerIds.size()
+        && !(c.gmUserId in c.playerIds) && !(c.gmUserId in c.pendingPlayerIds) && !(c.gmUserId in c.retiredPlayerIds)
+        && c.startMode in ['Fixed','Rolling'] && (c.startMode == 'Rolling' || c.pendingPlayerIds.size() == 0)
+        && c.lifecycleStatus in ['New','Established','Closed','Completed']
+        && c.status in ['Open','Full','Closed','Completed']
+        && ((c.lifecycleStatus == 'Completed' && c.status == 'Completed') || (c.lifecycleStatus == 'Closed' && c.status == 'Closed') ||
+          (c.lifecycleStatus in ['New','Established'] && ((c.status == 'Open' && c.currentPlayers < c.maxPlayers) || (c.status == 'Full' && c.currentPlayers == c.maxPlayers))))
+        && c.scheduleState in ['Recruiting','Confirmed'] && (c.scheduleState != 'Confirmed' || (c.currentPlayers >= c.minPlayers && c.startTime is timestamp))
+        && c.scheduleRevision is int && c.scheduleRevision >= 0
+        && c.description is string && c.description.size() > 0 && c.description.size() <= 20000
+        && c.sessionLengthHours is number && c.sessionLengthHours >= 0.5 && c.sessionLengthHours <= 24
+        && c.frequency in ['One-shot','Weekly','Biweekly','Monthly']
+        && ((c.startTime == null && c.startMode == 'Rolling' && c.dayOfWeek == null && c.localStartTime == null) ||
+          (c.startTime is timestamp && c.dayOfWeek in ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] && c.localStartTime is string && c.localStartTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')))
+        && c.timeZone is string && c.timeZone.size() > 0 && c.timeZone.size() <= 100;
+    }
+    function selfJoin() {
+      let old = resource.data; let next = request.resource.data;
+      return old.startMode == 'Fixed' && old.status == 'Open' && futureOrUnscheduled(old)
+        && old.gmUserId != request.auth.uid && !(request.auth.uid in old.playerIds)
+        && next.diff(old).affectedKeys().hasOnly(['playerIds','currentPlayers','status'])
+        && next.playerIds == old.playerIds.concat([request.auth.uid]);
+    }
+    function selfApplyOrWithdraw() {
+      let old = resource.data; let next = request.resource.data;
+      return old.startMode == 'Rolling' && old.status != 'Completed'
+        && next.diff(old).affectedKeys().hasOnly(['pendingPlayerIds']) && (
+          (old.status == 'Open' && futureOrUnscheduled(old) && request.auth.uid != old.gmUserId && !(request.auth.uid in old.playerIds) && !(request.auth.uid in old.pendingPlayerIds) && next.pendingPlayerIds == old.pendingPlayerIds.concat([request.auth.uid])) ||
+          (request.auth.uid in old.pendingPlayerIds && next.pendingPlayerIds == old.pendingPlayerIds.removeAll([request.auth.uid]))
+        );
+    }
+    function selfLeave() {
+      let old = resource.data; let next = request.resource.data;
+      return old.status != 'Completed' && request.auth.uid in old.playerIds
+        && next.diff(old).affectedKeys().hasOnly(['playerIds','retiredPlayerIds','currentPlayers','status','scheduleState'])
+        && next.playerIds == old.playerIds.removeAll([request.auth.uid])
+        && next.retiredPlayerIds == (request.auth.uid in old.retiredPlayerIds ? old.retiredPlayerIds : old.retiredPlayerIds.concat([request.auth.uid]))
+        && next.status == (old.status == 'Closed' ? 'Closed' : 'Open')
+        && next.scheduleState == (next.currentPlayers < next.minPlayers ? 'Recruiting' : old.scheduleState);
+    }
+    function gmDecide() {
+      let old = resource.data; let next = request.resource.data;
+      return request.auth.uid == old.gmUserId && old.startMode == 'Rolling' && old.status != 'Completed' && (
+        (next.diff(old).affectedKeys().hasOnly(['pendingPlayerIds']) && next.pendingPlayerIds.size() == old.pendingPlayerIds.size() - 1 && old.pendingPlayerIds.hasAll(next.pendingPlayerIds)) ||
+        (old.status == 'Open' && futureOrUnscheduled(old) && next.diff(old).affectedKeys().hasOnly(['pendingPlayerIds','playerIds','currentPlayers','status'])
+          && next.playerIds.size() == old.playerIds.size() + 1
+          && next.playerIds[next.playerIds.size() - 1] in old.pendingPlayerIds
+          && next.playerIds == old.playerIds.concat([next.playerIds[next.playerIds.size() - 1]])
+          && next.pendingPlayerIds == old.pendingPlayerIds.removeAll([next.playerIds[next.playerIds.size() - 1]]))
+      );
+    }
+    function gmUpdate() {
+      let old = resource.data; let next = request.resource.data;
+      return request.auth.uid == old.gmUserId && old.status != 'Completed' && (
+        (next.diff(old).affectedKeys().hasOnly(['status','lifecycleStatus']) && (next.lifecycleStatus != 'Established' || next.startTime is timestamp)) ||
+        (next.diff(old).affectedKeys().hasOnly(['scheduleState']) && next.scheduleState == 'Confirmed' && next.startTime > request.time) ||
+        (next.diff(old).affectedKeys().hasOnly(['name','systemType','minPlayers','maxPlayers','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','scheduleState','scheduleRevision','status','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast'])
+          && next.scheduleState == 'Recruiting' && next.lifecycleStatus == old.lifecycleStatus && next.status != 'Completed'
+          && next.scheduleRevision == old.scheduleRevision + 1 && futureOrUnscheduled(next)
+          && (old.startTime == null || next.startTime is timestamp)
+          && (old.startMode != 'Rolling' || old.startTime != null || next.startTime == null || next.currentPlayers >= next.minPlayers))
+      );
+    }
+    match /campaigns/{campaignId} {
+      allow read: if true;
+      allow create: if signedIn() && campaignValid(request.resource.data)
+        && request.resource.data.gmUserId == request.auth.uid
+        && request.resource.data.gmName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
+        && request.resource.data.playerIds.size() == 0 && request.resource.data.pendingPlayerIds.size() == 0 && request.resource.data.retiredPlayerIds.size() == 0
+        && request.resource.data.status == 'Open' && request.resource.data.lifecycleStatus == 'New'
+        && request.resource.data.scheduleState == 'Recruiting' && request.resource.data.scheduleRevision == 0
+        && futureOrUnscheduled(request.resource.data)
+        && (request.resource.data.startMode != 'Rolling' || request.resource.data.startTime == null);
+      allow update: if signedIn()
+        && (request.auth.uid == resource.data.gmUserId ? (gmDecide() || gmUpdate()) : (selfJoin() || selfApplyOrWithdraw() || selfLeave()))
+        && campaignValid(request.resource.data);
+      allow delete: if false;
+    }
+    function profileValid(p) {
+      return p.keys().hasAll(['username','biography','pastPlayerReviews','allowCampaignMessages']) && p.keys().hasOnly(['username','biography','pastPlayerReviews','allowCampaignMessages'])
+        && p.username is string && p.username.size() > 0 && p.username.size() <= 60
+        && p.biography is string && p.biography.size() <= 4000 && p.allowCampaignMessages is bool
+        && p.pastPlayerReviews is list && p.pastPlayerReviews.size() <= 20;
+    }
+    function validCacheAppend(targetUid) {
+      let old = resource.data.pastPlayerReviews; let next = request.resource.data.pastPlayerReviews;
+      let review = next[next.size() - 1]; let path = /databases/$(database)/documents/users/$(targetUid)/reviews/$(review.id);
+      return old.size() < 20 && next.size() == old.size() + 1 && next == old.concat([review])
+        && review.reviewerId == request.auth.uid && !exists(path) && existsAfter(path) && getAfter(path).data == review;
+    }
+    function participant(c, uid) { return c.gmUserId == uid || uid in c.playerIds || uid in c.retiredPlayerIds; }
+    function reviewValid(r, targetUid, reviewId) {
+      let c = get(/databases/$(database)/documents/campaigns/$(r.campaignId)).data;
+      return r.keys().hasAll(['id','rating','text','reviewerName','reviewerId','campaignId','createdAt'])
+        && r.keys().hasOnly(['id','rating','text','reviewerName','reviewerId','campaignId','createdAt'])
+        && r.id == reviewId && reviewId == r.campaignId + '_' + request.auth.uid
+        && r.reviewerId == request.auth.uid && targetUid != request.auth.uid
+        && r.reviewerName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
+        && r.rating is int && r.rating >= 1 && r.rating <= 5 && r.text is string && r.text.size() > 0 && r.text.size() <= 2000
+        && r.createdAt is timestamp && r.createdAt <= request.time && r.createdAt >= request.time - duration.value(5, 'm')
+        && c.status == 'Completed' && participant(c, request.auth.uid) && participant(c, targetUid);
+    }
+    function reviewCacheSynchronized(targetUid, review) {
+      let path = /databases/$(database)/documents/users/$(targetUid); let old = get(path).data.pastPlayerReviews; let next = getAfter(path).data.pastPlayerReviews;
+      return (old.size() < 20 && next == old.concat([review])) || (old.size() == 20 && next == old);
+    }
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if signedIn() && request.auth.uid == userId && profileValid(request.resource.data) && request.resource.data.pastPlayerReviews.size() == 0;
+      allow update: if signedIn() && profileValid(request.resource.data) && (
+        (request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','biography','allowCampaignMessages'])) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pastPlayerReviews']) && validCacheAppend(userId))
+      );
+      allow delete: if false;
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if signedIn() && reviewValid(request.resource.data, userId, reviewId) && reviewCacheSynchronized(userId, request.resource.data);
+        allow update, delete: if false;
+      }
+    }
+    function canContact(campaignId, targetUid) {
+      let c = get(/databases/$(database)/documents/campaigns/$(campaignId)).data;
+      return c.gmUserId == targetUid || ((targetUid in c.playerIds || targetUid in c.retiredPlayerIds)
+        && get(/databases/$(database)/documents/users/$(targetUid)).data.allowCampaignMessages == true);
+    }
+    function threadMember(t) { return signedIn() && request.auth.uid in t.participantIds; }
+    function otherParticipant(t) { return t.participantIds[0] == request.auth.uid ? t.participantIds[1] : t.participantIds[0]; }
+    function resolvingApplication(campaignId, applicantUid) {
+      let before = get(/databases/$(database)/documents/campaigns/$(campaignId)).data;
+      let after = getAfter(/databases/$(database)/documents/campaigns/$(campaignId)).data;
+      return signedIn() && before.gmUserId == request.auth.uid && before.status != 'Completed'
+        && applicantUid in before.pendingPlayerIds && !(applicantUid in after.pendingPlayerIds);
+    }
+    match /conversations/{conversationId} {
+      allow get: if signedIn() && (!exists(/databases/$(database)/documents/conversations/$(conversationId)) || threadMember(resource.data));
+      allow list: if threadMember(resource.data);
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll(['campaignId','campaignName','participantIds','createdBy','createdAt'])
+        && request.resource.data.keys().hasOnly(['campaignId','campaignName','participantIds','createdBy','createdAt'])
+        && request.resource.data.participantIds is list && request.resource.data.participantIds.size() == 2 && request.resource.data.participantIds.toSet().size() == 2
+        && threadMember(request.resource.data) && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.campaignName == get(/databases/$(database)/documents/campaigns/$(request.resource.data.campaignId)).data.name
+        && (canContact(request.resource.data.campaignId, otherParticipant(request.resource.data)) || resolvingApplication(request.resource.data.campaignId, otherParticipant(request.resource.data)));
+      allow update, delete: if false;
+      match /reads/{readerId} {
+        function ownReceipt() { return signedIn() && readerId == request.auth.uid && threadMember(get(/databases/$(database)/documents/conversations/$(conversationId)).data); }
+        allow get: if ownReceipt();
+        allow create, update: if ownReceipt()
+          && request.resource.data.keys().hasOnly(['readThrough'])
+          && request.resource.data.readThrough is timestamp && request.resource.data.readThrough <= request.time
+          && (!exists(/databases/$(database)/documents/conversations/$(conversationId)/reads/$(readerId)) || request.resource.data.readThrough >= resource.data.readThrough);
+        allow list, delete: if false;
+      }
+      match /messages/{messageId} {
+        function thread() { return get(/databases/$(database)/documents/conversations/$(conversationId)).data; }
+        function nextThread() { return getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data; }
+        function decisionValid(t) {
+          let after = getAfter(/databases/$(database)/documents/campaigns/$(t.campaignId)).data;
+          let applicant = otherParticipant(t);
+          return resolvingApplication(t.campaignId, applicant)
+            && request.resource.data.decision in ['Accepted', 'Declined']
+            && ((request.resource.data.decision == 'Accepted' && applicant in after.playerIds)
+              || (request.resource.data.decision == 'Declined' && !(applicant in after.playerIds)));
+        }
+        allow read: if threadMember(thread());
+        allow create: if threadMember(nextThread())
+          && request.resource.data.keys().hasAll(['senderId','text','createdAt']) && request.resource.data.keys().hasOnly(['senderId','text','createdAt','decision'])
+          && request.resource.data.senderId == request.auth.uid && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 4000
+          && request.resource.data.createdAt == request.time
+          && (('decision' in request.resource.data && decisionValid(nextThread()))
+            || (!('decision' in request.resource.data) && (otherParticipant(nextThread()) == nextThread().createdBy || canContact(nextThread().campaignId, otherParticipant(nextThread())))));
+        allow update, delete: if false;
+      }
+    }
+  }
+}
+

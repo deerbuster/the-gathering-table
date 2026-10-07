@@ -1,0 +1,32 @@
+<div class="narrow-page">
+  <p class="eyebrow">YOUR PLACE AT THE TABLE</p><h1>{{ auth.user() ? 'My account' : 'Welcome, adventurer.' }}</h1>
+  @if (message()) { <p class="notice" role="status">{{ message() }}</p> }
+  @if (!auth.ready()) { <p role="status">Checking your account…</p> }
+  @else if (auth.user(); as user) {
+    <section class="panel mt-6"><div class="section-heading"><h2>Your player profile</h2><button class="text-link" type="button" (click)="logout()">Sign out</button></div>
+      @if (auth.demo) { <p class="muted">You are using a sample identity. Profile changes stay in this preview.</p> }
+      <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="form-stack">
+        <label>Public player name<input formControlName="username" maxlength="60" required autocomplete="nickname"></label>
+        <label>Biography<textarea formControlName="biography" rows="5" maxlength="4000" placeholder="Your favorite systems, play style, and what you bring to a table."></textarea></label>
+        <label class="toggle-label"><input type="checkbox" formControlName="allowCampaignMessages"><span>Allow incoming campaign messages</span></label>
+        <p class="field-help">Opt in to questions from other users about campaigns where you are a current or retired player. Turning this off stops unsolicited incoming messages. You can still receive replies in conversations you started. Existing conversations remain readable. GMs can always be contacted about their own campaigns.</p>
+        <p class="field-help">Your name, biography, and reviews are public. Keep contact details private.</p>
+        <div class="action-row"><button class="button primary" [disabled]="busy() || profileForm.invalid">{{ busy() ? 'Saving…' : 'Save profile' }}</button><a [routerLink]="['/profile', user.uid]" class="text-link">View public profile →</a></div>
+      </form>
+    </section>
+    <a routerLink="/games" class="text-link mt-6 inline-block">Back to the tables →</a>
+  } @else if (auth.demo) {
+    <section class="panel mt-6"><h2>Explore the sample tables</h2><p class="muted">No account is created. Choose a role to test reservations, hosting, and scheduling.</p><div class="demo-identities"><button class="identity-option" type="button" (click)="enterDemo('player')"><strong>Alex · Player</strong><span>Find a campaign and reserve a seat.</span><b aria-hidden="true">→</b></button><button class="identity-option" type="button" (click)="enterDemo('gm')"><strong>Mara · Game master</strong><span>Manage The Ashen Frontier or host a new table.</span><b aria-hidden="true">→</b></button></div></section>
+  } @else {
+    <section class="panel mt-6"><div class="tabs mb-6"><button type="button" [class.selected]="mode() === 'login'" (click)="mode.set('login')">Sign in</button><button type="button" [class.selected]="mode() === 'register'" (click)="mode.set('register')">Create account</button></div>
+      <form [formGroup]="form" (ngSubmit)="submit()" class="form-stack">
+        @if (mode() === 'register') { <label>Public player name<input formControlName="username" maxlength="60" autocomplete="nickname"></label> }
+        <label>Email<input type="email" formControlName="email" autocomplete="email" required></label>
+        <label>Password<input type="password" formControlName="password" [attr.autocomplete]="mode() === 'register' ? 'new-password' : 'current-password'" minlength="8" required></label>
+        @if (form.invalid && form.touched) { <p class="error-text">Enter a valid email and a password of at least 8 characters.</p> }
+        <button class="button primary" [disabled]="busy()">{{ busy() ? 'Please wait…' : mode() === 'register' ? 'Create account' : 'Sign in' }}</button>
+        @if (mode() === 'login') { <button class="text-link" type="button" [disabled]="busy()" (click)="reset()">Forgot your password?</button> }
+      </form>
+    </section>
+  }
+</div>

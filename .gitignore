@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.angular/
+out-tsc/
+*-debug.log
+.firebase/
+public/firebase-config.json
+playwright-report/
+test-results/
