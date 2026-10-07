@@ -295,3 +295,19 @@ test('paid is a boolean flag controlled by the GM; legacy campaigns remain reada
   await assertSucceeds(getDoc(ref(null)));
   await assertSucceeds(updateDoc(ref('c'), { playerIds: ['a','b','c'], currentPlayers: 3, status: 'Full' }));
 });
+test('Preparing campaign blocks applications until GM opens recruitment', async () => {
+  const preparing = { ...campaign(), startMode: 'Rolling', startTime: null, localStartTime: null, dayOfWeek: null, currentPlayers: 0, playerIds: [], status: 'Preparing', lifecycleStatus: 'Preparing', scheduleState: 'Recruiting', backgroundImageURL: 'data:image/jpeg;base64,YQ==' };
+  const reference = doc(db('gm'), 'campaigns', 'preparing');
+  await assertSucceeds(setDoc(reference, preparing));
+  await assertFails(updateDoc(doc(db('c'), 'campaigns', 'preparing'), { pendingPlayerIds: ['c'] }));
+  await assertSucceeds(updateDoc(reference, { backgroundImageURL: '', scheduleRevision: 1 }));
+  await assertSucceeds(updateDoc(reference, { status: 'Open', lifecycleStatus: 'New' }));
+  await assertSucceeds(updateDoc(doc(db('c'), 'campaigns', 'preparing'), { pendingPlayerIds: ['c'] }));
+});
+test('campaign background changes are GM-only and bounded', async () => {
+  await assertFails(updateDoc(ref('a'), { backgroundImageURL: 'data:image/jpeg;base64,YQ==', scheduleState: 'Recruiting', scheduleRevision: 1 }));
+  await assertFails(updateDoc(ref('gm'), { backgroundImageURL: 'https://example.com/banner.jpg', scheduleState: 'Recruiting', scheduleRevision: 1 }));
+  await assertFails(updateDoc(ref('gm'), { backgroundImageURL: 'data:image/jpeg;base64,' + 'A'.repeat(300000), scheduleState: 'Recruiting', scheduleRevision: 1 }));
+  await assertSucceeds(updateDoc(ref('gm'), { backgroundImageURL: 'data:image/jpeg;base64,YQ==', scheduleState: 'Recruiting', scheduleRevision: 1 }));
+  await assertFails(updateDoc(ref('gm'), { status: 'Preparing', lifecycleStatus: 'Preparing' }));
+});

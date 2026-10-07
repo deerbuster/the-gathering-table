@@ -12,7 +12,7 @@ import {
 } from './models';
 import { demoCampaigns, demoProfiles } from './demo-data';
 import { localToDate, scheduleDay } from './time';
-import { validProfilePhoto } from './profile-photo';
+import { validProfilePhoto, validCampaignBackground } from './profile-photo';
 
 @Injectable({ providedIn: 'root' })
 export class CampaignService {
@@ -24,7 +24,7 @@ export class CampaignService {
   private readonly reviews = new BehaviorSubject<Record<string, Review[]>>({});
 
   readonly discoverableCampaigns$: Observable<Campaign[]> = this.firestore
-    ? collectionData(query(collection(this.firestore, 'campaigns'), where('status', 'in', ['Open', 'Full', 'Closed', 'Completed'])), { idField: 'id' }) as Observable<Campaign[]>
+    ? collectionData(query(collection(this.firestore, 'campaigns'), where('status', 'in', ['Preparing', 'Open', 'Full', 'Closed', 'Completed'])), { idField: 'id' }) as Observable<Campaign[]>
     : this.samples.asObservable();
 
   readonly openCampaigns$: Observable<Campaign[]> = this.firestore
@@ -94,6 +94,7 @@ export class CampaignService {
   async saveCampaign(input: CampaignInput, existingId?: string): Promise<string> {
     const uid = this.requireUser();
     validateInput(input);
+    if (!validCampaignBackground(input.backgroundImageURL ?? '')) throw new Error('Choose a valid campaign background.');
     const start = input.localDateTime ? localToDate(input.localDateTime, input.timeZone, input.occurrence) : null;
     if (start && start.getTime() <= Date.now()) throw new Error('Choose a future session time.');
     const profile = this.firestore
@@ -101,6 +102,7 @@ export class CampaignService {
       : this.profiles.value[uid];
     if (!profile) throw new Error('Create your player profile before hosting a campaign.');
     const scheduling = {
+      backgroundImageURL: input.backgroundImageURL ?? '',
       tableType: input.tableType,
       location: input.tableType === 'Physical' ? input.location.trim() : '',
       virtualPlatform: input.tableType === 'Virtual' ? input.virtualPlatform : null,
@@ -125,7 +127,7 @@ export class CampaignService {
       const row: Campaign = {
         ...scheduling, id, gmUserId: uid, gmName: profile.username,
         playerIds: old?.playerIds ?? [], pendingPlayerIds: old?.pendingPlayerIds ?? [], retiredPlayerIds: old?.retiredPlayerIds ?? [], currentPlayers: old?.currentPlayers ?? 0,
-        startTime: start ? Timestamp.fromDate(start) : null, scheduleRevision: old ? old.scheduleRevision + 1 : 0, lifecycleStatus: old?.lifecycleStatus ?? 'New', status: old?.status === 'Closed' ? 'Closed' : old?.currentPlayers === input.maxPlayers ? 'Full' : 'Open',
+        startTime: start ? Timestamp.fromDate(start) : null, scheduleRevision: old ? old.scheduleRevision + 1 : 0, lifecycleStatus: old?.lifecycleStatus ?? (input.openRecruitment ? 'New' : 'Preparing'), status: old ? (old.status === 'Preparing' ? 'Preparing' : old.status === 'Closed' ? 'Closed' : old.currentPlayers === input.maxPlayers ? 'Full' : 'Open') : (input.openRecruitment ? 'Open' : 'Preparing'),
       };
       this.samples.next([...this.samples.value.filter(c => c.id !== id), row]);
       return id;
@@ -139,11 +141,11 @@ export class CampaignService {
         if (old.gmUserId !== uid || old.status === 'Completed') throw new Error('This campaign cannot be edited.');
         if (old.currentPlayers > input.maxPlayers) throw new Error('Maximum seats cannot be fewer than current players.');
         this.validateRollingSchedule(input, start, old);
-        transaction.update(reference, { ...scheduling, scheduleRevision: old.scheduleRevision + 1, status: old.status === 'Closed' ? 'Closed' : old.currentPlayers === input.maxPlayers ? 'Full' : 'Open' });
+        transaction.update(reference, { ...scheduling, scheduleRevision: old.scheduleRevision + 1, status: old.status === 'Preparing' ? 'Preparing' : old.status === 'Closed' ? 'Closed' : old.currentPlayers === input.maxPlayers ? 'Full' : 'Open' });
       } else {
         this.validateRollingSchedule(input, start);
         // Firestore converts this JS Date to a UTC-backed native Timestamp.
-        transaction.set(reference, { ...scheduling, gmUserId: uid, gmName: profile.username, playerIds: [], pendingPlayerIds: [], retiredPlayerIds: [], currentPlayers: 0, scheduleRevision: 0, status: 'Open', lifecycleStatus: 'New' });
+        transaction.set(reference, { ...scheduling, gmUserId: uid, gmName: profile.username, playerIds: [], pendingPlayerIds: [], retiredPlayerIds: [], currentPlayers: 0, scheduleRevision: 0, status: input.openRecruitment ? 'Open' : 'Preparing', lifecycleStatus: input.openRecruitment ? 'New' : 'Preparing' });
       }
     });
     return reference.id;
@@ -190,8 +192,9 @@ export class CampaignService {
     const uid = this.requireUser();
     await this.change(id, c => {
       if (c.gmUserId !== uid || c.status === 'Completed') throw new Error('Only the GM can change an active campaign’s status.');
-      if (lifecycleStatus === 'Established' && !c.startTime) throw new Error('Schedule the first session before marking the campaign established.');
-      return { lifecycleStatus, status: lifecycleStatus === 'Completed' ? 'Completed' : lifecycleStatus === 'Closed' ? 'Closed' : c.currentPlayers === c.maxPlayers ? 'Full' : 'Open' };
+      if (lifecycleStatus === 'Established' && (c.lifecycleStatus === 'Preparing' || !c.startTime)) throw new Error('Schedule the first session before marking the campaign established.');
+      if (lifecycleStatus === 'Preparing' && (c.playerIds.length || c.pendingPlayerIds.length || c.retiredPlayerIds.length)) throw new Error('Use Closed to pause recruitment for a campaign with player history.');
+      return { lifecycleStatus, status: lifecycleStatus === 'Preparing' ? 'Preparing' : lifecycleStatus === 'Completed' ? 'Completed' : lifecycleStatus === 'Closed' ? 'Closed' : c.currentPlayers === c.maxPlayers ? 'Full' : 'Open' };
     });
   }
   async review(targetUid: string, campaignId: string, rating: number, text: string): Promise<void> {
@@ -255,5 +258,6 @@ export class CampaignService {
     });
   }
 }
+
 
 

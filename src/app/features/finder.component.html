@@ -7,7 +7,7 @@
   <label class="search-field"><span>Search campaigns</span><input formControlName="search" type="search" placeholder="A campaign, a GM, a new adventure…"></label>
   <label><span>ICE system</span><select formControlName="system"><option value="">All systems</option>@for (system of systems; track system) { <option [value]="system">{{ system }}</option> }</select></label>
   <label><span>GM schedule day</span><select formControlName="day"><option value="">Any day</option><option value="TBD">To be decided</option>@for (day of days; track day) { <option [value]="day">{{ day }}</option> }</select></label>
-  <label><span>Campaign status</span><select formControlName="lifecycle"><option value="Recruiting">Recruiting tables</option><option value="">All statuses</option><option value="New">New</option><option value="Established">Established</option><option value="Closed">Closed</option><option value="Completed">Completed</option></select></label>
+  <label><span>Campaign status</span><select formControlName="lifecycle"><option value="Recruiting">Recruiting tables</option><option value="">All statuses</option><option value="Preparing">Preparing · not recruiting</option><option value="New">New</option><option value="Established">Established</option><option value="Closed">Closed</option><option value="Completed">Completed</option></select></label>
 
   <label><span>Payment</span><select formControlName="payment"><option value="all">All games</option><option value="free">Free games</option><option value="paid">Paid games</option></select></label>
   <label class="toggle-label"><input type="checkbox" role="switch" formControlName="hideFull"><span>Hide full games</span></label>

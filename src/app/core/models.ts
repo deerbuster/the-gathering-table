@@ -18,8 +18,9 @@ export interface TableDetails {
 export type System = typeof SYSTEMS[number];
 export type Frequency = typeof FREQUENCIES[number];
 export type Day = typeof DAYS[number];
-export type LifecycleStatus = 'New' | 'Established' | 'Closed' | 'Completed';
+export type LifecycleStatus = 'Preparing' | 'New' | 'Established' | 'Closed' | 'Completed';
 export interface Campaign extends TableDetails {
+  backgroundImageURL?: string;
   paid?: boolean;
   id: string;
   name: string;
@@ -33,7 +34,7 @@ export interface Campaign extends TableDetails {
   pendingPlayerIds: string[];
   retiredPlayerIds: string[];
   startMode: 'Fixed' | 'Rolling';
-  status: 'Open' | 'Full' | 'Closed' | 'Completed';
+  status: 'Preparing' | 'Open' | 'Full' | 'Closed' | 'Completed';
   lifecycleStatus: LifecycleStatus;
   scheduleState: 'Recruiting' | 'Confirmed';
   scheduleRevision: number;
@@ -47,6 +48,8 @@ export interface Campaign extends TableDetails {
 }
 export type CampaignInput = TableDetails & Pick<Campaign, 'name' | 'systemType' | 'minPlayers' | 'maxPlayers' | 'description' | 'sessionLengthHours' | 'frequency' | 'timeZone' | 'startMode'> & {
   paid: boolean;
+  openRecruitment?: boolean;
+  backgroundImageURL?: string;
   localDateTime: string;
   occurrence: 'reject' | 'earlier' | 'later';
 };

@@ -17,8 +17,8 @@ service cloud.firestore {
                 && ((c.virtualPlatform == 'Other' && c.platformOther.size() > 0) || (c.virtualPlatform != 'Other' && c.platformOther == ''))))));
     }
     function campaignValid(c) {
-      return (!('paid' in c) || c.paid is bool) && tableValid(c) && c.keys().hasAll(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast'])
-        && c.keys().hasOnly(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast','paid'])
+      return (!('backgroundImageURL' in c) || (c.backgroundImageURL is string && c.backgroundImageURL.size() <= 300000 && (c.backgroundImageURL == '' || c.backgroundImageURL.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')))) && (!('paid' in c) || c.paid is bool) && tableValid(c) && c.keys().hasAll(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast'])
+        && c.keys().hasOnly(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast','paid','backgroundImageURL'])
         && c.name is string && c.name.size() > 0 && c.name.size() <= 120
         && c.systemType in ['Rolemaster Classic','RMSS','RMFRP','RMU','Space Master','MERP','HARP']
         && c.gmUserId is string && c.gmName is string && c.gmName.size() > 0 && c.gmName.size() <= 60
@@ -30,9 +30,9 @@ service cloud.firestore {
         && c.retiredPlayerIds is list && c.retiredPlayerIds.size() <= 500 && c.retiredPlayerIds.toSet().size() == c.retiredPlayerIds.size()
         && !(c.gmUserId in c.playerIds) && !(c.gmUserId in c.pendingPlayerIds) && !(c.gmUserId in c.retiredPlayerIds)
         && c.startMode in ['Fixed','Rolling'] && (c.startMode == 'Rolling' || c.pendingPlayerIds.size() == 0)
-        && c.lifecycleStatus in ['New','Established','Closed','Completed']
-        && c.status in ['Open','Full','Closed','Completed']
-        && ((c.lifecycleStatus == 'Completed' && c.status == 'Completed') || (c.lifecycleStatus == 'Closed' && c.status == 'Closed') ||
+        && c.lifecycleStatus in ['Preparing','New','Established','Closed','Completed']
+        && c.status in ['Preparing','Open','Full','Closed','Completed']
+        && ((c.lifecycleStatus == 'Preparing' && c.status == 'Preparing' && c.currentPlayers == 0 && c.pendingPlayerIds.size() == 0 && c.retiredPlayerIds.size() == 0) || (c.lifecycleStatus == 'Completed' && c.status == 'Completed') || (c.lifecycleStatus == 'Closed' && c.status == 'Closed') ||
           (c.lifecycleStatus in ['New','Established'] && ((c.status == 'Open' && c.currentPlayers < c.maxPlayers) || (c.status == 'Full' && c.currentPlayers == c.maxPlayers))))
         && c.scheduleState in ['Recruiting','Confirmed'] && (c.scheduleState != 'Confirmed' || (c.currentPlayers >= c.minPlayers && c.startTime is timestamp))
         && c.scheduleRevision is int && c.scheduleRevision >= 0
@@ -81,9 +81,9 @@ service cloud.firestore {
     function gmUpdate() {
       let old = resource.data; let next = request.resource.data;
       return request.auth.uid == old.gmUserId && old.status != 'Completed' && (
-        (next.diff(old).affectedKeys().hasOnly(['status','lifecycleStatus']) && (next.lifecycleStatus != 'Established' || next.startTime is timestamp)) ||
+        (next.diff(old).affectedKeys().hasOnly(['status','lifecycleStatus']) && (next.lifecycleStatus != 'Established' || (old.lifecycleStatus != 'Preparing' && next.startTime is timestamp))) ||
         (next.diff(old).affectedKeys().hasOnly(['scheduleState']) && next.scheduleState == 'Confirmed' && next.startTime > request.time) ||
-        (next.diff(old).affectedKeys().hasOnly(['name','systemType','minPlayers','maxPlayers','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','scheduleState','scheduleRevision','status','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast','paid'])
+        (next.diff(old).affectedKeys().hasOnly(['name','systemType','minPlayers','maxPlayers','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','scheduleState','scheduleRevision','status','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast','paid','backgroundImageURL'])
           && next.scheduleState == 'Recruiting' && next.lifecycleStatus == old.lifecycleStatus && next.status != 'Completed'
           && next.scheduleRevision == old.scheduleRevision + 1 && futureOrUnscheduled(next)
           && (old.startTime == null || next.startTime is timestamp)
@@ -96,7 +96,7 @@ service cloud.firestore {
         && request.resource.data.gmUserId == request.auth.uid
         && request.resource.data.gmName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
         && request.resource.data.playerIds.size() == 0 && request.resource.data.pendingPlayerIds.size() == 0 && request.resource.data.retiredPlayerIds.size() == 0
-        && request.resource.data.status == 'Open' && request.resource.data.lifecycleStatus == 'New'
+        && ((request.resource.data.status == 'Open' && request.resource.data.lifecycleStatus == 'New') || (request.resource.data.status == 'Preparing' && request.resource.data.lifecycleStatus == 'Preparing'))
         && request.resource.data.scheduleState == 'Recruiting' && request.resource.data.scheduleRevision == 0
         && futureOrUnscheduled(request.resource.data)
         && (request.resource.data.startMode != 'Rolling' || request.resource.data.startTime == null);

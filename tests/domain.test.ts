@@ -109,3 +109,15 @@ test('paid/free filters include legacy free tables and distinguish paid listings
   assert.equal(matchesPaymentFilter({ paid: true }, 'paid'), true);
   assert.equal(matchesPaymentFilter({ paid: true }, 'all'), true);
 });
+import { validCampaignBackground } from '../src/app/core/profile-photo';
+test('preparing tables reject joining and applications', () => {
+  const preparing: Campaign = { ...base, status: 'Preparing', lifecycleStatus: 'Preparing', currentPlayers: 0, playerIds: [], scheduleState: 'Recruiting' };
+  assert.throws(() => joinPatch(preparing, 'c'));
+  assert.throws(() => applyPatch({ ...preparing, startMode: 'Rolling' }, 'c'));
+});
+test('campaign backgrounds allow bounded JPEG data only', () => {
+  assert.equal(validCampaignBackground(''), true);
+  assert.equal(validCampaignBackground('data:image/jpeg;base64,YQ=='), true);
+  assert.equal(validCampaignBackground('https://example.com/image.jpg'), false);
+  assert.equal(validCampaignBackground('data:image/jpeg;base64,' + 'A'.repeat(300000)), false);
+});

@@ -1,3 +1,4 @@
+import { prepareCampaignBackground } from '../core/profile-photo';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -22,12 +23,16 @@ export class EditorComponent {
   readonly voiceServices = VOICE_SERVICES;
   readonly zones = [...new Set([Intl.DateTimeFormat().resolvedOptions().timeZone, 'America/Chicago', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Europe/Berlin', 'Asia/Tokyo', 'Australia/Sydney', 'UTC'])];
   readonly busy = signal(false);
+  readonly backgroundBusy = signal(false);
+  readonly backgroundPreview = signal('');
   readonly loading = signal(!!this.id);
   readonly blocked = signal(false);
   readonly message = signal('');
   readonly acceptedPlayers = signal(0);
   readonly alreadyScheduled = signal(false);
   readonly form = new FormGroup({
+    openRecruitment: new FormControl(false, { nonNullable: true }),
+    backgroundImageURL: new FormControl('', { nonNullable: true }),
     tableType: new FormControl<TableDetails['tableType']>('Virtual', { nonNullable: true }),
     location: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(300)] }),
     virtualPlatform: new FormControl<TableDetails['virtualPlatform']>('Fantasy Grounds'),
@@ -78,16 +83,25 @@ export class EditorComponent {
     catch { return null; }
   }
   async submit(): Promise<void> {
-    if (this.form.invalid || this.busy() || this.blocked()) { this.form.markAllAsTouched(); this.message.set('Complete the required fields.'); return; }
+    if (this.form.invalid || this.busy() || this.backgroundBusy() || this.blocked()) { this.form.markAllAsTouched(); this.message.set('Complete the required fields.'); return; }
     this.busy.set(true); this.message.set('');
     try { const id = await this.service.saveCampaign(this.form.getRawValue() as CampaignInput, this.id ?? undefined); await this.router.navigate(['/games', id]); }
     catch (error) { this.message.set(friendlyError(error)); }
     finally { this.busy.set(false); }
   }
+  async chooseBackground(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement; const file = input.files?.[0]; if (!file) return;
+    this.backgroundBusy.set(true); this.message.set('');
+    try { const image = await prepareCampaignBackground(file); this.form.controls.backgroundImageURL.setValue(image); this.backgroundPreview.set(image); }
+    catch (error) { this.message.set(friendlyError(error)); }
+    finally { this.backgroundBusy.set(false); input.value = ''; }
+  }
+  removeBackground(): void { this.form.controls.backgroundImageURL.setValue(''); this.backgroundPreview.set(''); }
   private async load(): Promise<void> {
     try {
       const c = await firstValueFrom(this.service.watchCampaign(this.id!));
       if (!c || c.status === 'Completed') { this.blocked.set(true); throw new Error('This campaign cannot be edited.'); }
+      this.backgroundPreview.set(c.backgroundImageURL ?? '');
       this.acceptedPlayers.set(c.currentPlayers);
       this.alreadyScheduled.set(!!c.startTime);
       this.form.patchValue({ ...c, virtualPlatform: c.virtualPlatform ?? 'Fantasy Grounds', voiceService: c.voiceService ?? 'Discord', localDateTime: c.startTime ? dateInZone(c.startTime.toDate(), c.timeZone) : '' });
@@ -95,4 +109,5 @@ export class EditorComponent {
     finally { this.loading.set(false); }
   }
 }
+
 

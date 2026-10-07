@@ -8,6 +8,7 @@
   @if (!blocked()) {
     <form [formGroup]="form" (ngSubmit)="submit()" class="editor-grid">
       <section class="panel form-stack"><h2>The campaign</h2>
+        @if (!id) { <label class="toggle-label"><input type="checkbox" formControlName="openRecruitment"><span>Open recruitment immediately</span></label><p class="field-help">Otherwise your table starts in Preparing: publicly visible, with applications and joining disabled until you open recruitment.</p> }
         <label>Campaign name<input formControlName="name" required maxlength="120" placeholder="The beginning of a good story"></label>
         <label>ICE system<select formControlName="systemType">@for (system of systems; track system) { <option [value]="system">{{ system }}</option> }</select></label>
         <h3>How the table meets</h3>
@@ -21,6 +22,10 @@
         <div class="two-columns"><label>Minimum players<input type="number" min="1" max="20" step="1" formControlName="minPlayers" required></label><label>Maximum players<input type="number" min="1" max="20" step="1" formControlName="maxPlayers" required></label></div>
         <p class="field-help">Player seats exclude you, the GM. Meeting the minimum makes the table ready for your confirmation.</p>
         <label>Description · Markdown supported<textarea rows="11" formControlName="description" maxlength="20000" required placeholder="The premise, play style, experience level, and how your group will meet. Keep private contact details out of public listings."></textarea></label>
+        <label>Campaign background<input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="busy() || backgroundBusy()" (change)="chooseBackground($event)"></label>
+        <p class="field-help">JPG, PNG or WebP, up to 5 MB. Cropped to a wide banner; keep important artwork near the center. Saved when you save the campaign.</p>
+        @if (backgroundBusy()) { <p role="status">Preparing background…</p> }
+        @if (backgroundPreview()) { <img class="campaign-background-preview" [src]="backgroundPreview()" alt="Campaign background preview"><button type="button" class="text-link" [disabled]="busy() || backgroundBusy()" (click)="removeBackground()">Remove background</button> }
       </section>
       <section class="panel form-stack"><h2>The next session</h2>
         @if (!id) { <label>First-session start policy<select formControlName="startMode"><option value="Rolling">Rolling start · schedule after players are accepted</option><option value="Fixed">Fixed start · publish a date now</option></select></label> } @else { <p class="field-help">{{ rolling() ? 'Rolling start · players need GM acceptance' : 'Fixed start · players reserve seats directly' }}</p> }
@@ -33,7 +38,7 @@
         <div class="two-columns"><label>Session length · hours<input type="number" min="0.5" max="24" step="0.5" formControlName="sessionLengthHours" required></label><label>Frequency<select formControlName="frequency">@for (frequency of frequencies; track frequency) { <option [value]="frequency">{{ frequency }}</option> }</select></label></div>
         <p class="field-help">The date sets the next session and its weekday. The GM can change the day, time, timezone, and frequency later to suit the group. Set each next session explicitly so holidays and clock changes never silently move your table.</p>
         @if (id) { <p class="field-help">Saving scheduling changes clears GM confirmation. Confirm the updated session from the campaign page.</p> }
-        <button class="button primary" [disabled]="busy() || form.invalid">{{ busy() ? 'Saving…' : id ? 'Save campaign' : 'Publish campaign' }}</button>
+        <button class="button primary" [disabled]="busy() || backgroundBusy() || form.invalid">{{ busy() ? 'Saving…' : id ? 'Save campaign' : 'Publish campaign' }}</button>
       </section>
     </form>
   }
