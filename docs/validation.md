@@ -10,7 +10,7 @@ Verified October 7, 2026.
 - Mobile dashboard: no horizontal overflow at a 390px viewport.
 - Built static app served under `/the-gathering-table/`; six sample campaigns supplied, with full tables hidden by default.
 
-The polyfill's transitive `jsbi` dependency produces an Angular CommonJS optimization warning; the build succeeds. No live Firebase project or GitHub repository was supplied. Live signup, deployed rules, actual GitHub Actions execution, and public deployment remain unverified until configured.
+The polyfill's transitive `jsbi` dependency produces an Angular CommonJS optimization warning; the build succeeds. Firebase project the-gathering-table-afd96 is configured. Firestore rules/indexes deployed successfully; email/password sign-in enabled and GitHub Pages hostname authorized. GitHub Actions passed all 42 tests and deployed commit 9c76131 at https://deerbuster.github.io/the-gathering-table/. Live browser discovery reads an empty Firestore catalog without errors and has no demo banner. Creating real accounts and exercising live authenticated player/GM writes remain pilot verification tasks.
 
 - Notification checks: GM sees one pending application and one unread incoming message; inbox opening alone preserves unread status, selecting the conversation clears it, and accepting the applicant clears the application alert. Read receipt security tests cover self-only access, future/backwards timestamps and extra fields.
 
@@ -18,3 +18,4 @@ The polyfill's transitive `jsbi` dependency produces an Angular CommonJS optimiz
 - Added checks: atomic acceptance/decline inbox updates, feedback delivery, opted-out applicants, forged/replayed status updates, physical location requirements, custom virtual/voice service names, and boolean recording/broadcast flags. Browser checks verified cancellation, acceptance feedback, physical location persistence, remote defaults, conditional required fields and FoundryVTT/Discord recording/broadcast disclosures.
 
 - Applicant browser check: opted-out Alex received an unread inbox alert; opening the GM conversation displayed Application accepted and the welcome feedback, then cleared the badge. No console errors; no horizontal overflow at 390px.
+
