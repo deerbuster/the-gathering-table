@@ -8,7 +8,7 @@ export function friendlyError(error: unknown): string {
       'auth/invalid-email': 'Enter a valid email address.',
       'auth/too-many-requests': 'Too many attempts. Please try again later.',
       'auth/network-request-failed': 'Check your internet connection and try again.',
-      'permission-denied': 'This change was not allowed. Refresh and check your account or campaign status.',
+      'permission-denied': 'This change was not allowed. Check email verification, account restrictions, and campaign permissions in My account.',
       'unavailable': 'The service is unavailable. Check your connection and try again.',
     };
     return messages[code] ?? 'The change could not be saved. Please try again.';

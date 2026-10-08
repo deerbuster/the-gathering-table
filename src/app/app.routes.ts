@@ -5,6 +5,7 @@ export const routes: Routes = [
   { path: 'host', loadComponent: () => import('./features/editor.component').then(m => m.EditorComponent) },
   { path: 'games/:id/edit', loadComponent: () => import('./features/editor.component').then(m => m.EditorComponent) },
   { path: 'games/:id', loadComponent: () => import('./features/detail.component').then(m => m.DetailComponent) },
+  { path: 'moderation', loadComponent: () => import('./features/moderation.component').then(m => m.ModerationComponent) },
   { path: 'account', loadComponent: () => import('./features/account.component').then(m => m.AccountComponent) },
   { path: 'inbox', loadComponent: () => import('./features/inbox.component').then(m => m.InboxComponent) },
   { path: 'profile/:uid', loadComponent: () => import('./features/profile.component').then(m => m.ProfileComponent) },

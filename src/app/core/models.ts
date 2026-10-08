@@ -21,6 +21,8 @@ export type Frequency = typeof FREQUENCIES[number];
 export type Day = typeof DAYS[number];
 export type LifecycleStatus = 'Preparing' | 'New' | 'Established' | 'Closed' | 'Completed';
 export interface Campaign extends TableDetails, CampaignPreferences {
+  moderationRevision?: number;
+  lastModerationId?: string;
   backgroundImageURL?: string;
   paid?: boolean;
   id: string;
@@ -70,7 +72,7 @@ export interface Profile {
   pastPlayerReviews: Review[];
   allowCampaignMessages: boolean;
 }
-export interface Identity { uid: string; email: string | null; }
+export interface Identity { uid: string; email: string | null; emailVerified?: boolean; }
 
 export function validateInput(input: CampaignInput): void {
   validatePreferences(input);

@@ -18,6 +18,7 @@ import { AuthService } from './core/auth.service';
           <span>The Gathering Table<small>FIND YOUR TABLE</small></span>
         </a>
         <nav aria-label="Main navigation">
+          @if (auth.staff()) { <a routerLink="/moderation" routerLinkActive="active">Moderation</a> }
           <a routerLink="/games" routerLinkActive="active">Find games</a>
           <a routerLink="/host" routerLinkActive="active">Host a game</a>
           @if (pendingApplications()) { <a routerLink="/games" [queryParams]="{ view: 'applications' }" [attr.aria-label]="pendingApplications() + ' pending applications'">Applications <span class="unread-badge" aria-hidden="true">{{ pendingApplications() }}</span></a> }
@@ -29,6 +30,8 @@ import { AuthService } from './core/auth.service';
     @if (auth.demo) {
       <div class="demo-banner"><div class="shell"><strong>Sample preview</strong> · Explore the app with demo identities. Changes reset when you reload. <a routerLink="/account">Try as a player or GM →</a></div></div>
     }
+    @if (auth.user() && !auth.verified()) { <div class="demo-banner"><div class="shell">Verify your email to participate. <a routerLink="/account">Verify email →</a></div></div> }
+    @if (auth.banned() || auth.timedOut() || auth.muted()) { <div class="demo-banner"><div class="shell">Your account has an active restriction. <a routerLink="/account">View reason and expiry →</a></div></div> }
     <main id="main" tabindex="-1" class="shell main-content"><router-outlet /></main>
     <footer class="shell footer"><span>The Gathering Table</span><span>For players of Iron Crown Enterprises games. An independent community platform.</span><span>Matchmaking & scheduling</span></footer>
   `,

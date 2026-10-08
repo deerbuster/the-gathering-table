@@ -3,6 +3,14 @@
   @if (message()) { <p class="notice" role="status">{{ message() }}</p> }
   @if (!auth.ready()) { <p role="status">Checking your account…</p> }
   @else if (auth.user(); as user) {
+    @if (!auth.verified()) { <section class="panel mt-6"><h2>Verify your email</h2><p>Open the verification link sent to {{ user.email }}. Verified email is required to participate.</p><div class="action-row"><button class="button secondary" [disabled]="busy()" (click)="verification(false)">Send verification email</button><button class="button primary" [disabled]="busy()" (click)="verification(true)">I have verified my email</button></div></section> }
+    <section class="panel mt-6"><h2>Account access</h2><p>Role: {{ auth.access().role }}</p>@if (auth.accessError()) { <p role="alert">{{ auth.accessError() }}</p> }
+      @if (auth.banned()) { <p class="notice">Account banned · {{ auth.access().ban?.permanent ? 'Permanent' : (restrictionEnd(auth.access().ban) | date:'medium') }}</p> }
+      @if (auth.timedOut()) { <p class="notice">Timeout ends {{ restrictionEnd(auth.access().timeout) | date:'medium' }}</p> }
+      @if (auth.muted()) { <p class="notice">Mute ends {{ restrictionEnd(auth.access().mute) | date:'medium' }}</p> }
+      <p class="field-help">Timed restrictions expire automatically. Messages and reviews are blocked while muted; all participation is blocked during a timeout or ban.</p>
+      @for (entry of accountActions(); track entry.id) { <article class="review"><strong>{{ entry.kind }}</strong><p>{{ entry.reason }}</p><p class="muted">{{ entry.actorName }} · {{ entry.createdAt?.toDate() | date:'medium' }}</p></article> }
+    </section>
     <section class="panel mt-6"><div class="section-heading"><h2>Your player profile</h2><button class="text-link" type="button" (click)="logout()">Sign out</button></div>
       @if (auth.demo) { <p class="muted">You are using a sample identity. Profile changes stay in this preview.</p> }
       <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="form-stack">
@@ -13,7 +21,7 @@
         <label class="toggle-label"><input type="checkbox" formControlName="allowCampaignMessages"><span>Allow incoming campaign messages</span></label>
         <p class="field-help">Opt in to questions from other users about campaigns where you are a current or retired player. Turning this off stops unsolicited incoming messages. You can still receive replies in conversations you started. Existing conversations remain readable. GMs can always be contacted about their own campaigns.</p>
         <p class="field-help">Your name, biography, and reviews are public. Keep contact details private.</p>
-        <div class="action-row"><button class="button primary" [disabled]="busy() || photoBusy() || profileForm.invalid">{{ photoBusy() ? 'Preparing picture…' : busy() ? 'Saving…' : 'Save profile' }}</button><a [routerLink]="['/profile', user.uid]" class="text-link">View public profile →</a></div>
+        <div class="action-row"><button class="button primary" [disabled]="busy() || photoBusy() || profileForm.invalid || !auth.verified() || !auth.accessReady() || auth.banned() || auth.timedOut()">{{ photoBusy() ? 'Preparing picture…' : busy() ? 'Saving…' : 'Save profile' }}</button><a [routerLink]="['/profile', user.uid]" class="text-link">View public profile →</a></div>
       </form>
     </section>
     <a routerLink="/games" class="text-link mt-6 inline-block">Back to the tables →</a>

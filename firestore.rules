@@ -2,6 +2,40 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    function defaultAccountAccess() { return { 'role':'Member', 'timeout':null, 'mute':null, 'ban':null, 'revision':0, 'lastActionId':'', 'updatedAt':null }; }
+    function accessFor(uid) { let path = /databases/$(database)/documents/accountAccess/$(uid); return exists(path) ? get(path).data : defaultAccountAccess(); }
+    function activeRestriction(r) { return r != null && (r.permanent || r.startedAt + duration.value(r.seconds, 's') > request.time); }
+    function canAccess() { return signedIn() && request.auth.token.email_verified == true && !activeRestriction(accessFor(request.auth.uid).ban); }
+    function canParticipate() { return canAccess() && !activeRestriction(accessFor(request.auth.uid).timeout); }
+    function canCommunicate() { return canParticipate() && !activeRestriction(accessFor(request.auth.uid).mute); }
+    function staff() { return canParticipate() && accessFor(request.auth.uid).role in ['Admin','Moderator']; }
+    function admin() { return canParticipate() && accessFor(request.auth.uid).role == 'Admin'; }
+    function protectedOwner(uid) { return exists(/databases/$(database)/documents/siteSecurity/owner) && get(/databases/$(database)/documents/siteSecurity/owner).data.uid == uid; }
+    function auditActor(e) { return e.actorUid == request.auth.uid && e.actorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username && e.createdAt == request.time && e.reason is string && e.reason.matches('(?s).*[^\\s].*') && e.reason.size() <= 2000; }
+    function restrictionValid(r, ban) { return r == null || (r.keys().hasAll(['startedAt','seconds','permanent']) && r.keys().hasOnly(['startedAt','seconds','permanent']) && r.startedAt is timestamp && r.seconds is int && r.permanent is bool && (ban ? ((r.permanent && r.seconds == 0) || (!r.permanent && r.seconds in [604800,2592000,7776000])) : (!r.permanent && r.seconds in [3600,86400,604800]))); }
+    function accessValid(a) { return a.keys().hasAll(['role','timeout','mute','ban','revision','lastActionId','updatedAt']) && a.keys().hasOnly(['role','timeout','mute','ban','revision','lastActionId','updatedAt']) && a.role in ['Member','Moderator','Admin'] && restrictionValid(a.timeout, false) && restrictionValid(a.mute, false) && restrictionValid(a.ban, true) && a.revision is int && a.lastActionId is string && a.updatedAt is timestamp; }
+    function accountActionValid(uid, next) {
+      let before = accessFor(uid);
+      let e = getAfter(/databases/$(database)/documents/accountAccess/$(uid)/actions/$(next.lastActionId)).data;
+      let field = e.kind == 'Role' ? 'role' : e.kind in ['Timeout','ClearTimeout'] ? 'timeout' : e.kind in ['Mute','ClearMute'] ? 'mute' : 'ban';
+      return staff() && exists(/databases/$(database)/documents/users/$(uid)) && uid != request.auth.uid && !protectedOwner(uid) && (before.role == 'Member' || admin())
+        && accessValid(next) && next.revision == before.revision + 1 && next.updatedAt == request.time
+        && e.keys().hasAll(['actorUid','actorName','createdAt','reason','kind','before','after']) && e.keys().hasOnly(['actorUid','actorName','createdAt','reason','kind','before','after'])
+        && auditActor(e) && e.before == before && e.after == next && next.diff(before).affectedKeys().hasOnly([field,'revision','lastActionId','updatedAt'])
+        && ((e.kind == 'Role' && admin()) || (e.kind == 'Timeout' && next.timeout != null && next.timeout.startedAt == request.time) || (e.kind == 'Mute' && next.mute != null && next.mute.startedAt == request.time) || (e.kind == 'Ban' && next.ban != null && next.ban.startedAt == request.time) || (e.kind == 'ClearTimeout' && next.timeout == null) || (e.kind == 'ClearMute' && next.mute == null) || (e.kind == 'Unban' && next.ban == null));
+    }
+    match /siteSecurity/{documentId} { allow get: if signedIn(); allow list, write: if false; }
+    match /accountAccess/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || staff());
+      allow list: if staff();
+      allow create, update: if accountActionValid(uid, request.resource.data);
+      allow delete: if false;
+      match /actions/{actionId} {
+        allow read: if signedIn() && (request.auth.uid == uid || staff());
+        allow create: if staff() && getAfter(/databases/$(database)/documents/accountAccess/$(uid)).data.lastActionId == actionId && accountActionValid(uid, getAfter(/databases/$(database)/documents/accountAccess/$(uid)).data);
+        allow update, delete: if false;
+      }
+    }
     function futureOrUnscheduled(c) { return c.startTime == null || c.startTime > request.time; }
     function tableValid(c) {
       return c.tableType in ['Physical','Virtual','Theater of the Mind']
@@ -23,8 +57,8 @@ service cloud.firestore {
         && (!('contentNotes' in c) || (c.contentNotes is string && c.contentNotes.size() <= 2000));
     }
     function campaignValid(c) {
-      return preferencesValid(c) && (!('backgroundImageURL' in c) || (c.backgroundImageURL is string && c.backgroundImageURL.size() <= 300000 && (c.backgroundImageURL == '' || c.backgroundImageURL.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')))) && (!('paid' in c) || c.paid is bool) && tableValid(c) && c.keys().hasAll(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast'])
-        && c.keys().hasOnly(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast','paid','backgroundImageURL','tags','playerAge','contentRating','contentNotes'])
+      return (!('moderationRevision' in c) || (c.moderationRevision is int && c.moderationRevision >= 0 && c.lastModerationId is string)) && preferencesValid(c) && (!('backgroundImageURL' in c) || (c.backgroundImageURL is string && c.backgroundImageURL.size() <= 300000 && (c.backgroundImageURL == '' || c.backgroundImageURL.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')))) && (!('paid' in c) || c.paid is bool) && tableValid(c) && (c.keys().hasAll(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast']))
+        && (c.keys().hasOnly(['name','systemType','gmUserId','gmName','minPlayers','maxPlayers','currentPlayers','playerIds','pendingPlayerIds','retiredPlayerIds','startMode','lifecycleStatus','status','scheduleState','scheduleRevision','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast','paid','backgroundImageURL','tags','playerAge','contentRating','contentNotes','moderationRevision','lastModerationId']))
         && c.name is string && c.name.size() > 0 && c.name.size() <= 120
         && c.systemType in ['Rolemaster Classic','RMSS','RMFRP','RMU','Space Master','MERP','HARP']
         && c.gmUserId is string && c.gmName is string && c.gmName.size() > 0 && c.gmName.size() <= 60
@@ -48,6 +82,27 @@ service cloud.firestore {
         && ((c.startTime == null && c.startMode == 'Rolling' && c.dayOfWeek == null && c.localStartTime == null) ||
           (c.startTime is timestamp && c.dayOfWeek in ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] && c.localStartTime is string && c.localStartTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')))
         && c.timeZone is string && c.timeZone.size() > 0 && c.timeZone.size() <= 100;
+    }
+    // Updates are already constrained to explicit field allowlists by their action.
+    // Validate only mutable groups so unrelated fields cannot exhaust the rules budget.
+    function campaignContentValid(c) { return c.name is string && c.name.size() > 0 && c.name.size() <= 120 && c.description is string && c.description.size() > 0 && c.description.size() <= 20000; }
+    function campaignStateValid(c) {
+      return c.currentPlayers is int && c.currentPlayers >= 0 && c.currentPlayers <= c.maxPlayers && c.playerIds.size() == c.currentPlayers && c.pendingPlayerIds.size() <= 50 && c.retiredPlayerIds.size() <= 500
+        && ((c.lifecycleStatus == 'Preparing' && c.status == 'Preparing' && c.currentPlayers == 0 && c.pendingPlayerIds.size() == 0 && c.retiredPlayerIds.size() == 0) || (c.lifecycleStatus == 'Completed' && c.status == 'Completed') || (c.lifecycleStatus == 'Closed' && c.status == 'Closed') || (c.lifecycleStatus in ['New','Established'] && ((c.status == 'Open' && c.currentPlayers < c.maxPlayers) || (c.status == 'Full' && c.currentPlayers == c.maxPlayers))))
+        && c.scheduleState in ['Recruiting','Confirmed'] && (c.scheduleState != 'Confirmed' || (c.currentPlayers >= c.minPlayers && c.startTime is timestamp));
+    }
+    function campaignEditorValid(c) {
+      return campaignContentValid(c) && preferencesValid(c) && tableValid(c)
+        && (!('backgroundImageURL' in c) || (c.backgroundImageURL is string && c.backgroundImageURL.size() <= 300000 && (c.backgroundImageURL == '' || c.backgroundImageURL.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$'))))
+        && (!('paid' in c) || c.paid is bool) && c.systemType in ['Rolemaster Classic','RMSS','RMFRP','RMU','Space Master','MERP','HARP']
+        && c.minPlayers is int && c.maxPlayers is int && c.minPlayers >= 1 && c.maxPlayers <= 20 && c.minPlayers <= c.maxPlayers
+        && c.sessionLengthHours is number && c.sessionLengthHours >= 0.5 && c.sessionLengthHours <= 24 && c.frequency in ['One-shot','Weekly','Biweekly','Monthly']
+        && c.timeZone is string && c.timeZone.size() > 0 && c.timeZone.size() <= 100
+        && ((c.startTime == null && c.startMode == 'Rolling' && c.dayOfWeek == null && c.localStartTime == null) || (c.startTime is timestamp && c.dayOfWeek in ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] && c.localStartTime is string && c.localStartTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')));
+    }
+    function campaignMutationValid(old, next) {
+      let changed = next.diff(old).affectedKeys();
+      return changed.hasAny(['moderationRevision','lastModerationId']) ? (next.moderationRevision is int && next.lastModerationId is string && campaignContentValid(next)) : campaignStateValid(next) && (!changed.hasAny(['scheduleRevision']) || campaignEditorValid(next));
     }
     function selfJoin() {
       let old = resource.data; let next = request.resource.data; let changed = next.diff(old).affectedKeys();
@@ -100,9 +155,17 @@ service cloud.firestore {
         )
       );
     }
+    function moderatedCampaignValid(campaignId, old, next) {
+      let e = getAfter(/databases/$(database)/documents/campaigns/$(campaignId)/actions/$(next.lastModerationId)).data;
+      return staff() && next.diff(old).affectedKeys().hasOnly(['name','description','moderationRevision','lastModerationId'])
+        && next.moderationRevision == old.get('moderationRevision', 0) + 1
+        && e.keys().hasAll(['actorUid','actorName','createdAt','reason','kind','before','after']) && e.keys().hasOnly(['actorUid','actorName','createdAt','reason','kind','before','after'])
+        && auditActor(e) && e.kind == 'ContentEdit' && e.before == { 'name': old.name, 'description': old.description } && e.after == { 'name': next.name, 'description': next.description };
+    }
     match /campaigns/{campaignId} {
       allow read: if true;
-      allow create: if signedIn() && campaignValid(request.resource.data) && request.resource.data.paid is bool
+      allow create: if canParticipate() && campaignValid(request.resource.data) && request.resource.data.paid is bool
+        && !request.resource.data.keys().hasAny(['moderationRevision','lastModerationId'])
         && request.resource.data.gmUserId == request.auth.uid
         && request.resource.data.gmName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
         && request.resource.data.playerIds.size() == 0 && request.resource.data.pendingPlayerIds.size() == 0 && request.resource.data.retiredPlayerIds.size() == 0
@@ -110,10 +173,18 @@ service cloud.firestore {
         && request.resource.data.scheduleState == 'Recruiting' && request.resource.data.scheduleRevision == 0
         && futureOrUnscheduled(request.resource.data)
         && (request.resource.data.startMode != 'Rolling' || request.resource.data.startTime == null);
-      allow update: if signedIn()
-        && (request.auth.uid == resource.data.gmUserId ? (request.resource.data.diff(resource.data).affectedKeys().hasAny(['playerIds','pendingPlayerIds']) ? gmDecide() : gmUpdate()) : (selfJoin() || selfApplyOrWithdraw() || selfLeave()))
-        && campaignValid(request.resource.data);
+      allow update: if canParticipate()
+        && (request.resource.data.diff(resource.data).affectedKeys().hasAny(['moderationRevision','lastModerationId'])
+          ? moderatedCampaignValid(campaignId, resource.data, request.resource.data)
+          : (request.auth.uid == resource.data.gmUserId ? (request.resource.data.diff(resource.data).affectedKeys().hasAny(['playerIds','pendingPlayerIds']) ? gmDecide() : gmUpdate()) : (selfJoin() || selfApplyOrWithdraw() || selfLeave())))
+        && campaignMutationValid(resource.data, request.resource.data);
       allow delete: if false;
+      match /actions/{actionId} {
+        allow read: if canAccess() && (staff() || get(/databases/$(database)/documents/campaigns/$(campaignId)).data.gmUserId == request.auth.uid);
+        allow create: if staff() && getAfter(/databases/$(database)/documents/campaigns/$(campaignId)).data.lastModerationId == actionId && moderatedCampaignValid(campaignId, get(/databases/$(database)/documents/campaigns/$(campaignId)).data, getAfter(/databases/$(database)/documents/campaigns/$(campaignId)).data);
+        allow update, delete: if false;
+      }
+
     }
     function profileValid(p) {
       return p.keys().hasAll(['username','biography','pastPlayerReviews','allowCampaignMessages']) && p.keys().hasOnly(['username','biography','pastPlayerReviews','allowCampaignMessages','photoURL'])
@@ -146,15 +217,15 @@ service cloud.firestore {
     }
     match /users/{userId} {
       allow read: if true;
-      allow create: if signedIn() && request.auth.uid == userId && profileValid(request.resource.data) && request.resource.data.pastPlayerReviews.size() == 0;
-      allow update: if signedIn() && profileValid(request.resource.data) && (
+      allow create: if canParticipate() && request.auth.uid == userId && profileValid(request.resource.data) && request.resource.data.pastPlayerReviews.size() == 0;
+      allow update: if canParticipate() && profileValid(request.resource.data) && (
         (request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username','biography','allowCampaignMessages','photoURL'])) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pastPlayerReviews']) && validCacheAppend(userId))
+        (canCommunicate() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pastPlayerReviews']) && validCacheAppend(userId))
       );
       allow delete: if false;
       match /reviews/{reviewId} {
         allow read: if true;
-        allow create: if signedIn() && reviewValid(request.resource.data, userId, reviewId) && reviewCacheSynchronized(userId, request.resource.data);
+        allow create: if canCommunicate() && reviewValid(request.resource.data, userId, reviewId) && reviewCacheSynchronized(userId, request.resource.data);
         allow update, delete: if false;
       }
     }
@@ -163,7 +234,7 @@ service cloud.firestore {
       return c.gmUserId == targetUid || ((targetUid in c.playerIds || targetUid in c.retiredPlayerIds)
         && get(/databases/$(database)/documents/users/$(targetUid)).data.allowCampaignMessages == true);
     }
-    function threadMember(t) { return signedIn() && request.auth.uid in t.participantIds; }
+    function threadMember(t) { return canAccess() && request.auth.uid in t.participantIds; }
     function otherParticipant(t) { return t.participantIds[0] == request.auth.uid ? t.participantIds[1] : t.participantIds[0]; }
     function resolvingApplication(campaignId, applicantUid) {
       let before = get(/databases/$(database)/documents/campaigns/$(campaignId)).data;
@@ -172,9 +243,9 @@ service cloud.firestore {
         && applicantUid in before.pendingPlayerIds && !(applicantUid in after.pendingPlayerIds);
     }
     match /conversations/{conversationId} {
-      allow get: if signedIn() && (!exists(/databases/$(database)/documents/conversations/$(conversationId)) || threadMember(resource.data));
+      allow get: if canAccess() && (!exists(/databases/$(database)/documents/conversations/$(conversationId)) || threadMember(resource.data));
       allow list: if threadMember(resource.data);
-      allow create: if signedIn()
+      allow create: if canCommunicate()
         && request.resource.data.keys().hasAll(['campaignId','campaignName','participantIds','createdBy','createdAt'])
         && request.resource.data.keys().hasOnly(['campaignId','campaignName','participantIds','createdBy','createdAt'])
         && request.resource.data.participantIds is list && request.resource.data.participantIds.size() == 2 && request.resource.data.participantIds.toSet().size() == 2
@@ -204,7 +275,7 @@ service cloud.firestore {
               || (request.resource.data.decision == 'Declined' && !(applicant in after.playerIds)));
         }
         allow read: if threadMember(thread());
-        allow create: if threadMember(nextThread())
+        allow create: if canCommunicate() && threadMember(nextThread())
           && request.resource.data.keys().hasAll(['senderId','text','createdAt']) && request.resource.data.keys().hasOnly(['senderId','text','createdAt','decision'])
           && request.resource.data.senderId == request.auth.uid && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 4000
           && request.resource.data.createdAt == request.time

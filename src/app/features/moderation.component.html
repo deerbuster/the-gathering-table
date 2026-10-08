@@ -1,0 +1,28 @@
+<p class="eyebrow">COMMUNITY STEWARDSHIP</p><h1>Moderation</h1>
+@if (!auth.staff()) { <section class="empty-state"><h2>Staff access required</h2><p>Only verified, unrestricted Admins and Moderators can use these tools.</p><a class="button secondary" routerLink="/account">My account</a></section> }
+@else {
+  @if (auth.demo) { <p class="notice">Demo moderation only. No real account is affected.</p> }
+  @if (message()) { <p class="notice" role="status">{{ message() }}</p> }
+  <div class="editor-grid">
+  <section class="panel"><h2>Account actions</h2><p class="field-help">Only Admins can assign roles or moderate staff. The owner and your own account are protected. Browse the first 100 player names, or paste an account ID from its profile link.</p>
+    <form [formGroup]="accountForm" (ngSubmit)="act()" class="form-stack">
+      <label>Account ID<input formControlName="uid" list="moderation-accounts" placeholder="Paste account ID"><datalist id="moderation-accounts">@for (person of people(); track person.uid) { <option [value]="person.uid">{{ person.username }}</option> }</datalist></label><button class="button secondary" type="button" (click)="loadAccount()">Load account</button>
+      @if (target()) { <a [routerLink]="['/profile', target()]">View public profile →</a><p>Role: {{ access().role }}</p>
+        @for (item of [{label:'Timeout', value:access().timeout}, {label:'Mute', value:access().mute}, {label:'Ban', value:access().ban}]; track item.label) { @if (item.value) { <p>{{ item.label }}: {{ restrictionActive(item.value, auth.now()) ? 'Active' : 'Expired' }} · {{ item.value.permanent ? 'Permanent' : (restrictionEnd(item.value) | date:'medium') }}</p> } }
+        <label>Action<select formControlName="kind"><option value="Timeout">Timeout · block participation</option><option value="Mute">Mute · block messages and reviews</option><option value="Ban">Ban · block private access and participation</option><option value="ClearTimeout">Lift timeout</option><option value="ClearMute">Lift mute</option><option value="Unban">Lift ban</option>@if (auth.admin()) { <option value="Role">Assign role</option> }</select></label>
+        @if (kind() === 'Role') { <label>Role<select formControlName="role"><option value="Member">Member</option><option value="Moderator">Moderator</option><option value="Admin">Admin</option></select></label> }
+        @if (kind() === 'Timeout' || kind() === 'Mute' || kind() === 'Ban') { <label>Duration<select formControlName="duration">@for (duration of kind() === 'Ban' ? banDurations : shortDurations; track duration.seconds) { <option [value]="duration.seconds">{{ duration.label }}</option> }</select></label> }
+        <label>Reason · visible to this account<textarea formControlName="reason" maxlength="2000" rows="3" required></textarea></label>
+        <button class="button primary" [disabled]="busy() || accountForm.invalid || target() === owner() || target() === auth.user()?.uid">{{ busy() ? 'Recording…' : 'Apply & record action' }}</button>
+      }
+    </form>
+    <h3 class="mt-6">Account history · latest 50</h3>@for (entry of actions(); track entry.id) { <article class="review"><strong>{{ entry.kind }}</strong><p>{{ entry.reason }}</p><p class="muted">{{ entry.actorName }} ({{ entry.actorUid }}) · {{ entry.createdAt?.toDate() | date:'medium' }}</p></article> } @empty { <p class="muted">No recorded account actions.</p> }
+  </section>
+  <section class="panel"><h2>Campaign content</h2><p class="field-help">Moderators may edit names and descriptions. Seats, schedules, ownership and recruitment status remain under GM control. Every change requires a reason.</p>
+    <form [formGroup]="contentForm" (ngSubmit)="saveContent()" class="form-stack">
+      <label>Campaign ID<input formControlName="id" placeholder="ID from the campaign link"></label><button type="button" class="button secondary" (click)="loadCampaign()">Load campaign</button>
+      @if (campaign(); as c) { <a [routerLink]="['/games', c.id]">View campaign →</a><label>Campaign name<input formControlName="name" maxlength="120" required></label><label>Description · Markdown<textarea formControlName="description" rows="8" maxlength="20000" required></textarea></label><label>Reason · visible to staff and GM<textarea formControlName="reason" rows="3" maxlength="2000" required></textarea></label><button class="button primary" [disabled]="busy() || contentForm.invalid">Save & record moderation</button> }
+    </form>
+    <h3 class="mt-6">Campaign history · latest 50</h3>@for (entry of campaignActions(); track entry.id) { <article class="review"><strong>{{ entry.kind }}</strong><p>{{ entry.reason }}</p><p class="muted">{{ entry.actorName }} ({{ entry.actorUid }}) · {{ entry.createdAt?.toDate() | date:'medium' }}</p></article> } @empty { <p class="muted">No recorded campaign actions.</p> }
+  </section></div>
+}

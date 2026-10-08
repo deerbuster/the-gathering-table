@@ -129,7 +129,5 @@ export class MessageService {
     }
     await addDoc(collection(this.firestore, 'conversations', conversation.id, 'messages'), { senderId: uid, text: body, createdAt: serverTimestamp() });
   }
-  private requireUser(): string {
-    const user = this.auth.user(); if (!user) throw new Error('Sign in to send a message.'); return user.uid;
-  }
+  private requireUser(): string { return this.auth.requireParticipation(true); }
 }

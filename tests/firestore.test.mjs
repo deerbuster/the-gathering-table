@@ -2,19 +2,21 @@ import { readFile } from 'node:fs/promises';
 import { before, after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc, getDoc, getDocs, collection, query, where, serverTimestamp, runTransaction, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, getDocs, collection, query, where, serverTimestamp, runTransaction, Timestamp, writeBatch } from 'firebase/firestore';
 
 let env;
 const profile = { username: 'Adventurer', biography: '', pastPlayerReviews: [], allowCampaignMessages: false };
 const campaign = () => ({ tableType: 'Virtual', location: '', virtualPlatform: 'Fantasy Grounds', platformOther: '', voiceService: 'Discord', voiceOther: '', recorded: false, broadcast: false, paid: false, name: 'Test', systemType: 'RMU', gmUserId: 'gm', gmName: 'Adventurer', minPlayers: 2, maxPlayers: 3, currentPlayers: 2, playerIds: ['a','b'], retiredPlayerIds: [], pendingPlayerIds: [], startMode: 'Fixed', lifecycleStatus: 'New', scheduleRevision: 0, status: 'Open', scheduleState: 'Confirmed', description: 'Adventure', dayOfWeek: 'Friday', sessionLengthHours: 3, frequency: 'Weekly', startTime: Timestamp.fromMillis(Date.now() + 86400000), timeZone: 'America/Chicago', localStartTime: '19:00' });
-const db = uid => uid ? env.authenticatedContext(uid).firestore() : env.unauthenticatedContext().firestore();
+const db = uid => uid ? env.authenticatedContext(uid, { email_verified: true }).firestore() : env.unauthenticatedContext().firestore();
 const ref = uid => doc(db(uid), 'campaigns', 'table');
 before(async () => { env = await initializeTestEnvironment({ projectId: 'demo-the-gathering-table', firestore: { rules: await readFile(new URL('../firestore.rules', import.meta.url), 'utf8') } }); });
 beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async ctx => {
-    for (const uid of ['gm','a','b','c','d']) await setDoc(doc(ctx.firestore(), 'users', uid), profile);
+    for (const uid of ['gm','a','b','c','d','owner','admin','mod']) await setDoc(doc(ctx.firestore(), 'users', uid), profile);
     await setDoc(doc(ctx.firestore(), 'campaigns', 'table'), campaign());
+    await setDoc(doc(ctx.firestore(), 'siteSecurity', 'owner'), { uid: 'owner' });
+    for (const [uid, role] of [['owner','Admin'],['admin','Admin'],['mod','Moderator']]) await setDoc(doc(ctx.firestore(), 'accountAccess', uid), { ...emptyAccess(), role });
   });
 });
 after(async () => { await env?.cleanup(); });
@@ -340,4 +342,118 @@ test('full editor saves and GM decisions stay within the rules expression budget
   await assertSucceeds(updateDoc(ref('a'), { playerIds: ['b','c'], retiredPlayerIds: ['a'], currentPlayers: 2, status: 'Closed' }));
   const saved = (await getDoc(ref(null))).data();
   assert.equal(saved.contentRating, 'T'); assert.equal(saved.backgroundImageURL, image);
+});
+
+function emptyAccess() { return { role: 'Member', timeout: null, mute: null, ban: null, revision: 0, lastActionId: '', updatedAt: null }; }
+async function seedAccess(uid, patch) { await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), 'accountAccess', uid), { ...emptyAccess(), ...patch }); }); }
+async function accountAction(actor, target, kind, value, reason = 'Moderation reason', id = 'action') {
+  let before;
+  await env.withSecurityRulesDisabled(async ctx => { const snapshot = await getDoc(doc(ctx.firestore(), 'accountAccess', target)); before = snapshot.exists() ? snapshot.data() : emptyAccess(); });
+  const after = { ...before, revision: before.revision + 1, lastActionId: id, updatedAt: serverTimestamp() };
+  if (kind === 'Role') after.role = value;
+  if (['Timeout','Mute','Ban'].includes(kind)) after[kind.toLowerCase()] = { startedAt: serverTimestamp(), seconds: value, permanent: kind === 'Ban' && value === 0 };
+  if (kind === 'ClearTimeout') after.timeout = null;
+  if (kind === 'ClearMute') after.mute = null;
+  if (kind === 'Unban') after.ban = null;
+  const firestore = db(actor); const batch = writeBatch(firestore);
+  batch.set(doc(firestore, 'accountAccess', target), after);
+  batch.set(doc(firestore, 'accountAccess', target, 'actions', id), { actorUid: actor, actorName: 'Adventurer', kind, reason, createdAt: serverTimestamp(), before, after });
+  return batch.commit();
+}
+async function campaignModeration(actor, patch = {}, reason = 'Remove inappropriate wording', id = 'edit') {
+  const firestore = db(actor); const snapshot = await getDoc(ref(actor)); const before = snapshot.data();
+  const after = { name: 'Moderated title', description: 'Moderated description', ...patch };
+  const batch = writeBatch(firestore); batch.update(doc(firestore, 'campaigns', 'table'), { ...after, moderationRevision: (before.moderationRevision ?? 0) + 1, lastModerationId: id });
+  batch.set(doc(firestore, 'campaigns', 'table', 'actions', id), { actorUid: actor, actorName: 'Adventurer', kind: 'ContentEdit', reason, createdAt: serverTimestamp(), before: { name: before.name, description: before.description }, after: { name: after.name, description: after.description } });
+  return batch.commit();
+}
+test('unverified email cannot participate even when authenticated', async () => {
+  const unverified = env.authenticatedContext('c', { email_verified: false }).firestore();
+  await assertFails(updateDoc(doc(unverified, 'campaigns', 'table'), { playerIds: ['a','b','c'], currentPlayers: 3, status: 'Full' }));
+  await assertFails(updateDoc(doc(unverified, 'users', 'c'), { biography: 'Changed' }));
+  await assertSucceeds(getDoc(doc(unverified, 'accountAccess', 'c')));
+});
+test('only Admin assigns roles; Moderator cannot elevate itself or modify staff', async () => {
+  await assertFails(accountAction('c', 'd', 'Role', 'Admin'));
+  await assertFails(accountAction('mod', 'c', 'Role', 'Admin'));
+  await assertFails(accountAction('admin', 'admin', 'Role', 'Member'));
+  await assertFails(accountAction('admin', 'owner', 'Role', 'Member'));
+  await assertFails(accountAction('mod', 'admin', 'Timeout', 3600));
+  await assertSucceeds(accountAction('admin', 'c', 'Role', 'Moderator'));
+  assert.equal((await getDoc(doc(db('c'), 'accountAccess', 'c'))).data().role, 'Moderator');
+});
+test('account restrictions require an atomic, immutable audit and a reason', async () => {
+  await assertFails(setDoc(doc(db('admin'), 'accountAccess', 'c'), { ...emptyAccess(), timeout: { startedAt: serverTimestamp(), seconds: 3600, permanent: false }, revision: 1, lastActionId: 'missing', updatedAt: serverTimestamp() }));
+  await assertFails(accountAction('mod', 'c', 'Timeout', 3600, ''));
+  await assertFails(accountAction('mod', 'c', 'Timeout', 3600, '   '));
+  await assertFails(accountAction('mod', 'nonexistent', 'Timeout', 3600));
+  await assertFails(accountAction('mod', 'c', 'Timeout', 1800));
+  await assertSucceeds(accountAction('mod', 'c', 'Timeout', 3600));
+  await assertFails(updateDoc(doc(db('admin'), 'accountAccess', 'c', 'actions', 'action'), { reason: 'Rewrite history' }));
+  await assertFails(getDoc(doc(db('d'), 'accountAccess', 'c', 'actions', 'action')));
+  await assertSucceeds(getDoc(doc(db('c'), 'accountAccess', 'c', 'actions', 'action')));
+});
+test('timeouts and bans block writes and expire using server time without cleanup', async () => {
+  const startedAt = Timestamp.now();
+  await seedAccess('c', { timeout: { startedAt, seconds: 3600, permanent: false } });
+  await assertFails(updateDoc(ref('c'), { playerIds: ['a','b','c'], currentPlayers: 3, status: 'Full' }));
+  await seedAccess('c', { timeout: { startedAt: Timestamp.fromMillis(Date.now() - 3601000), seconds: 3600, permanent: false } });
+  await assertSucceeds(updateDoc(doc(db('c'), 'users', 'c'), { biography: 'Timeout expired' }));
+  await seedAccess('c', { ban: { startedAt, seconds: 604800, permanent: false } });
+  await assertFails(updateDoc(doc(db('c'), 'users', 'c'), { biography: 'Banned' }));
+  await seedAccess('c', { ban: { startedAt: Timestamp.fromMillis(Date.now() - 604801000), seconds: 604800, permanent: false } });
+  await assertSucceeds(updateDoc(doc(db('c'), 'users', 'c'), { biography: 'Ban expired' }));
+  await seedAccess('c', { ban: { startedAt: Timestamp.fromMillis(1), seconds: 0, permanent: true } });
+  await assertFails(updateDoc(doc(db('c'), 'users', 'c'), { biography: 'Permanent ban' }));
+});
+test('all requested restriction durations and lifting restrictions are auditable', async () => {
+  let n = 0;
+  for (const seconds of [3600,86400,604800]) await assertSucceeds(accountAction('mod','c','Timeout',seconds,'Reason',String(++n)));
+  for (const seconds of [3600,86400,604800]) await assertSucceeds(accountAction('mod','c','Mute',seconds,'Reason',String(++n)));
+  for (const seconds of [604800,2592000,7776000,0]) await assertSucceeds(accountAction('mod','c','Ban',seconds,'Reason',String(++n)));
+  for (const kind of ['ClearTimeout','ClearMute','Unban']) await assertSucceeds(accountAction('mod','c',kind,0,'Lift restriction',String(++n)));
+  const saved = (await getDoc(doc(db('c'), 'accountAccess', 'c'))).data(); assert.equal(saved.ban, null); assert.equal(saved.timeout, null); assert.equal(saved.mute, null);
+});
+test('campaign moderation is atomic, audited, content-only and available to staff', async () => {
+  await assertFails(campaignModeration('c'));
+  await assertFails(campaignModeration('mod', { gmUserId: 'mod' }));
+  await assertFails(campaignModeration('mod', {}, ''));
+  await assertFails(updateDoc(ref('mod'), { name: 'No audit', moderationRevision: 1, lastModerationId: 'missing' }));
+  await assertSucceeds(campaignModeration('mod'));
+  const saved = (await getDoc(ref(null))).data(); assert.equal(saved.name, 'Moderated title'); assert.equal(saved.scheduleState, 'Confirmed'); assert.equal(saved.scheduleRevision, 0);
+  await assertSucceeds(getDoc(doc(db('gm'), 'campaigns', 'table', 'actions', 'edit')));
+  await assertFails(getDoc(doc(db('c'), 'campaigns', 'table', 'actions', 'edit')));
+  await assertFails(updateDoc(doc(db('admin'), 'campaigns', 'table', 'actions', 'edit'), { reason: 'Forged' }));
+});
+test('restricted or unverified staff cannot use their privileges', async () => {
+  await seedAccess('mod', { role: 'Moderator', timeout: { startedAt: Timestamp.now(), seconds: 3600, permanent: false } });
+  await assertFails(accountAction('mod','c','Ban',604800));
+  await assertFails(campaignModeration('mod'));
+});
+test('mutes block messages and reviews, but allow reading and other participation', async () => {
+  await thread('c','gm'); await message('c');
+  await seedAccess('c', { mute: { startedAt: Timestamp.now(), seconds: 3600, permanent: false } });
+  await assertFails(message('c'));
+  await assertFails(thread('c','gm','second'));
+  await assertSucceeds(getDoc(doc(db('c'), 'conversations', 'conversation')));
+  await assertSucceeds(updateDoc(ref('c'), { playerIds: ['a','b','c'], currentPlayers: 3, status: 'Full' }));
+  await seedAccess('c', { mute: { startedAt: Timestamp.fromMillis(Date.now() - 3601000), seconds: 3600, permanent: false } });
+  await assertSucceeds(message('c'));
+  await seedAccess('c', { ban: { startedAt: Timestamp.now(), seconds: 604800, permanent: false } });
+  await assertFails(getDoc(doc(db('c'), 'conversations', 'conversation')));
+  await assertSucceeds(getDoc(ref(null)));
+});
+test('muted participant cannot publish a review, including its cached copy', async () => {
+  await env.withSecurityRulesDisabled(ctx => updateDoc(doc(ctx.firestore(),'campaigns','table'), { status:'Completed', lifecycleStatus:'Completed' }));
+  await seedAccess('a', { mute: { startedAt:Timestamp.now(), seconds:86400, permanent:false } });
+  const review = { id:'table_a', reviewerId:'a', reviewerName:'Adventurer', campaignId:'table', rating:5, text:'Review', createdAt:Timestamp.now() };
+  const firestore = db('a'); const batch = writeBatch(firestore);
+  batch.set(doc(firestore,'users','b','reviews','table_a'), review);
+  batch.update(doc(firestore,'users','b'), { pastPlayerReviews:[review] });
+  await assertFails(batch.commit());
+});
+test('clients cannot alter the owner anchor or forge standalone audit entries', async () => {
+  await assertFails(setDoc(doc(db('admin'),'siteSecurity','owner'), { uid:'admin' }));
+  await assertFails(setDoc(doc(db('mod'),'accountAccess','c','actions','forged'), { actorUid:'owner', actorName:'Adventurer', kind:'Role', reason:'Forged', createdAt:serverTimestamp(), before:emptyAccess(), after:{...emptyAccess(),role:'Admin'} }));
+  await assertFails(setDoc(doc(db('mod'),'campaigns','table','actions','forged'), { actorUid:'mod', actorName:'Adventurer', kind:'ContentEdit', reason:'Unrelated audit', createdAt:serverTimestamp(), before:{name:'Test',description:'Adventure'}, after:{name:'Test',description:'Adventure'} }));
 });

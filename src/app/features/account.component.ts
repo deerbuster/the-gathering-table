@@ -7,13 +7,18 @@ import { AuthService } from '../core/auth.service';
 import { CampaignService } from '../core/campaign.service';
 import { friendlyError } from '../core/error';
 import { prepareProfilePhoto } from '../core/profile-photo';
+import { restrictionEnd } from '../core/moderation';
+import { ModerationService } from '../core/moderation.service';
+import { DatePipe } from '@angular/common';
 import { AvatarComponent } from '../shared/avatar.component';
 
 @Component({
-  imports: [ReactiveFormsModule, RouterLink, AvatarComponent], changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DatePipe, ReactiveFormsModule, RouterLink, AvatarComponent], changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './account.component.html',
 })
 export class AccountComponent {
+  readonly restrictionEnd = restrictionEnd;
+  readonly moderation = inject(ModerationService);
   readonly auth = inject(AuthService);
   private readonly service = inject(CampaignService);
   private readonly router = inject(Router);
@@ -34,6 +39,7 @@ export class AccountComponent {
     allowCampaignMessages: new FormControl(true, { nonNullable: true }),
     photoURL: new FormControl('', { nonNullable: true }),
   });
+  readonly accountActions = toSignal(toObservable(this.auth.user).pipe(switchMap(user => user ? this.moderation.watchAccountActions(user.uid).pipe(catchError(() => of([]))) : of([]))), { initialValue: [] });
   readonly profile = toSignal(toObservable(this.auth.user).pipe(switchMap(user => user ? this.service.watchProfile(user.uid).pipe(catchError(error => { this.message.set(friendlyError(error)); return of(null); })) : of(null))));
   constructor() {
     effect(() => {
@@ -43,7 +49,7 @@ export class AccountComponent {
     });
   }
   async enterDemo(role: 'player' | 'gm'): Promise<void> {
-    this.auth.enterDemo(role);
+    this.message.set(''); this.auth.enterDemo(role);
     await this.returnTo();
   }
   async submit(): Promise<void> {
@@ -54,11 +60,17 @@ export class AccountComponent {
       if (this.mode() === 'register') {
         if (!username.trim()) throw new Error('Enter your public player name.');
         const uid = await this.auth.register(email, password);
-        await this.service.saveProfile(username, '', uid);
+        this.profileForm.controls.username.setValue(username);
+        this.message.set('Verification email sent. Verify your address, then refresh verification and save your profile.');
       } else await this.auth.login(email, password);
-      await this.returnTo();
+      if (this.auth.verified()) await this.returnTo();
     } catch (error) { this.message.set(friendlyError(error)); }
     finally { this.busy.set(false); }
+  }
+  async verification(refresh: boolean): Promise<void> {
+    this.busy.set(true); this.message.set('');
+    try { if (refresh) { await this.auth.refreshVerification(); this.message.set(this.auth.verified() ? 'Email verified. You can save your profile and participate.' : 'Email is not verified yet. Open the link in your verification email.'); } else { await this.auth.sendVerification(); this.message.set('Verification email sent.'); } }
+    catch (error) { this.message.set(friendlyError(error)); } finally { this.busy.set(false); }
   }
   async reset(): Promise<void> {
     if (this.form.controls.email.invalid) { this.message.set('Enter your email above first.'); return; }

@@ -140,3 +140,20 @@ test('campaign preferences reject invented tags, duplicate tags and invalid rati
   assert.throws(() => validatePreferences({ contentRating: 'X' }));
   assert.throws(() => validatePreferences({ contentNotes: 'A'.repeat(2001) }));
 });
+import { restrictionActive, restrictionEnd, validateAction } from '../src/app/core/moderation';
+test('restriction expiry is automatic and permanent bans never expire', () => {
+  const startedAt = Timestamp.fromMillis(1000);
+  assert.equal(restrictionActive({ startedAt, seconds:3600, permanent:false }, 3600999), true);
+  assert.equal(restrictionActive({ startedAt, seconds:3600, permanent:false }, 3601000), false);
+  assert.equal(restrictionActive({ startedAt, seconds:0, permanent:true }, 999999999), true);
+  assert.equal(restrictionEnd({ startedAt, seconds:3600, permanent:false })?.getTime(), 3601000);
+  assert.equal(restrictionEnd({ startedAt:null, seconds:3600, permanent:false }), null);
+});
+test('account actions require reasons and predefined durations', () => {
+  assert.doesNotThrow(() => validateAction('Timeout', 3600, 'Reason'));
+  assert.doesNotThrow(() => validateAction('Mute', 604800, 'Reason'));
+  assert.doesNotThrow(() => validateAction('Ban', 0, 'Reason'));
+  assert.throws(() => validateAction('Role', 'Owner', 'Reason'));
+  assert.throws(() => validateAction('Mute', 0, 'Reason'));
+  assert.throws(() => validateAction('Timeout', 3600, '   '));
+});

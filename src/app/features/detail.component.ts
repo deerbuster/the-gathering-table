@@ -1,5 +1,7 @@
 import { CampaignPreferencesComponent } from '../shared/campaign-preferences.component';
 import { AvatarComponent } from '../shared/avatar.component';
+import { ModerationService } from '../core/moderation.service';
+import { toObservable } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -17,6 +19,7 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 @Component({ imports: [CampaignPreferencesComponent, AvatarComponent, RouterLink, DatePipe, ReactiveFormsModule], changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './detail.component.html' })
 export class DetailComponent {
   readonly auth = inject(AuthService);
+  private readonly moderation = inject(ModerationService);
   private readonly service = inject(CampaignService);
   private readonly messages = inject(MessageService);
   private readonly route = inject(ActivatedRoute);
@@ -34,6 +37,7 @@ export class DetailComponent {
   readonly timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   private readonly campaign$ = this.route.paramMap.pipe(switchMap(params => this.service.watchCampaign(params.get('id')!).pipe(catchError(error => { this.loadError.set(friendlyError(error)); return of(null); }))));
   readonly campaign = toSignal(this.campaign$);
+  readonly campaignActions = toSignal(combineLatest([this.campaign$, toObservable(this.auth.user), toObservable(this.auth.staff)]).pipe(switchMap(([c, user, staff]) => c && user && (staff || c.gmUserId === user.uid) ? this.moderation.watchCampaignActions(c.id).pipe(catchError(() => of([]))) : of([]))), { initialValue: [] });
   readonly roster = toSignal(this.campaign$.pipe(switchMap(c => c ? combineLatest([c.gmUserId, ...c.playerIds].map(uid => this.service.watchProfile(uid).pipe(map(profile => ({ uid, name: profile?.username ?? (uid === c.gmUserId ? c.gmName : 'Adventurer'), gm: uid === c.gmUserId, photoURL: profile?.photoURL ?? '', allowMessages: profile?.allowCampaignMessages ?? false })), catchError(() => of({ uid, name: 'Adventurer', gm: uid === c.gmUserId, photoURL: '', allowMessages: false }))))) : of([])), catchError(() => of([]))), { initialValue: [] });
   readonly retired = toSignal(this.campaign$.pipe(switchMap(c => {
     const ids = c?.retiredPlayerIds.filter(uid => !c.playerIds.includes(uid)) ?? [];

@@ -199,7 +199,7 @@ export class CampaignService {
     });
   }
   async review(targetUid: string, campaignId: string, rating: number, text: string): Promise<void> {
-    const uid = this.requireUser();
+    const uid = this.auth.requireParticipation(true);
     if (uid === targetUid || !Number.isInteger(rating) || rating < 1 || rating > 5 || !text.trim() || text.length > 2000) throw new Error('Choose a rating from 1–5 and write a review of up to 2,000 characters.');
     const id = `${campaignId}_${uid}`;
     if (!this.firestore) {
@@ -233,10 +233,10 @@ export class CampaignService {
       if (cache.length < 20) transaction.update(targetRef, { pastPlayerReviews: [...cache, review] });
     });
   }
-  private requireUser(): string {
-    const user = this.auth.user();
-    if (!user) throw new Error('Sign in to take a seat or host a campaign.');
-    return user.uid;
+  private requireUser(): string { return this.auth.requireParticipation(); }
+  async moderateDemoContent(id: string, name: string, description: string): Promise<void> {
+    if (this.firestore || !this.auth.staff()) throw new Error('Moderation access required.');
+    await this.change(id, () => ({ name, description }));
   }
   private validateRollingSchedule(input: CampaignInput, start: Date | null, old?: Campaign): void {
     if (old && old.startMode !== input.startMode) throw new Error('The start policy cannot change after publication.');
