@@ -23,3 +23,5 @@ The polyfill's transitive `jsbi` dependency produces an Angular CommonJS optimiz
 - Paid flag: 15 domain and 31 emulator tests pass. Paid-only demo search returns one table; Free-only returns four non-full tables; All restores both. Mobile filter width verified at 390px with no overflow. Legacy campaign reads and membership changes remain valid.
 
 - Campaign tags: 19 domain and 35 Firestore emulator tests pass. Coverage includes combined filters, legacy missing metadata, duplicate/invented tags, invalid age/rating, bounded notes, GM-only updates and membership writes preserving tags.
+
+- Save regression: full editor payloads exceeded Firestore's 1,000-expression budget because unrelated GM action branches repeatedly evaluated field differences. Rules now select the applicable action before validation and cache field differences. A full legacy campaign save with a 220 KB image and preferences now passes, followed by acceptance, scheduling, confirmation, lifecycle changes and retirement. All 36 emulator tests pass.

@@ -50,34 +50,34 @@ service cloud.firestore {
         && c.timeZone is string && c.timeZone.size() > 0 && c.timeZone.size() <= 100;
     }
     function selfJoin() {
-      let old = resource.data; let next = request.resource.data;
+      let old = resource.data; let next = request.resource.data; let changed = next.diff(old).affectedKeys();
       return old.startMode == 'Fixed' && old.status == 'Open' && futureOrUnscheduled(old)
         && old.gmUserId != request.auth.uid && !(request.auth.uid in old.playerIds)
-        && next.diff(old).affectedKeys().hasOnly(['playerIds','currentPlayers','status'])
+        && changed.hasOnly(['playerIds','currentPlayers','status'])
         && next.playerIds == old.playerIds.concat([request.auth.uid]);
     }
     function selfApplyOrWithdraw() {
-      let old = resource.data; let next = request.resource.data;
+      let old = resource.data; let next = request.resource.data; let changed = next.diff(old).affectedKeys();
       return old.startMode == 'Rolling' && old.status != 'Completed'
-        && next.diff(old).affectedKeys().hasOnly(['pendingPlayerIds']) && (
+        && changed.hasOnly(['pendingPlayerIds']) && (
           (old.status == 'Open' && futureOrUnscheduled(old) && request.auth.uid != old.gmUserId && !(request.auth.uid in old.playerIds) && !(request.auth.uid in old.pendingPlayerIds) && next.pendingPlayerIds == old.pendingPlayerIds.concat([request.auth.uid])) ||
           (request.auth.uid in old.pendingPlayerIds && next.pendingPlayerIds == old.pendingPlayerIds.removeAll([request.auth.uid]))
         );
     }
     function selfLeave() {
-      let old = resource.data; let next = request.resource.data;
+      let old = resource.data; let next = request.resource.data; let changed = next.diff(old).affectedKeys();
       return old.status != 'Completed' && request.auth.uid in old.playerIds
-        && next.diff(old).affectedKeys().hasOnly(['playerIds','retiredPlayerIds','currentPlayers','status','scheduleState'])
+        && changed.hasOnly(['playerIds','retiredPlayerIds','currentPlayers','status','scheduleState'])
         && next.playerIds == old.playerIds.removeAll([request.auth.uid])
         && next.retiredPlayerIds == (request.auth.uid in old.retiredPlayerIds ? old.retiredPlayerIds : old.retiredPlayerIds.concat([request.auth.uid]))
         && next.status == (old.status == 'Closed' ? 'Closed' : 'Open')
         && next.scheduleState == (next.currentPlayers < next.minPlayers ? 'Recruiting' : old.scheduleState);
     }
     function gmDecide() {
-      let old = resource.data; let next = request.resource.data;
+      let old = resource.data; let next = request.resource.data; let changed = next.diff(old).affectedKeys();
       return request.auth.uid == old.gmUserId && old.startMode == 'Rolling' && old.status != 'Completed' && (
-        (next.diff(old).affectedKeys().hasOnly(['pendingPlayerIds']) && next.pendingPlayerIds.size() == old.pendingPlayerIds.size() - 1 && old.pendingPlayerIds.hasAll(next.pendingPlayerIds)) ||
-        (old.status == 'Open' && futureOrUnscheduled(old) && next.diff(old).affectedKeys().hasOnly(['pendingPlayerIds','playerIds','currentPlayers','status'])
+        (changed.hasOnly(['pendingPlayerIds']) && next.pendingPlayerIds.size() == old.pendingPlayerIds.size() - 1 && old.pendingPlayerIds.hasAll(next.pendingPlayerIds)) ||
+        (old.status == 'Open' && futureOrUnscheduled(old) && changed.hasOnly(['pendingPlayerIds','playerIds','currentPlayers','status'])
           && next.playerIds.size() == old.playerIds.size() + 1
           && next.playerIds[next.playerIds.size() - 1] in old.pendingPlayerIds
           && next.playerIds == old.playerIds.concat([next.playerIds[next.playerIds.size() - 1]])
@@ -85,15 +85,19 @@ service cloud.firestore {
       );
     }
     function gmUpdate() {
-      let old = resource.data; let next = request.resource.data;
+      let old = resource.data; let next = request.resource.data; let changed = next.diff(old).affectedKeys();
       return request.auth.uid == old.gmUserId && old.status != 'Completed' && (
-        (next.diff(old).affectedKeys().hasOnly(['status','lifecycleStatus']) && (next.lifecycleStatus != 'Established' || (old.lifecycleStatus != 'Preparing' && next.startTime is timestamp))) ||
-        (next.diff(old).affectedKeys().hasOnly(['scheduleState']) && next.scheduleState == 'Confirmed' && next.startTime > request.time) ||
-        (next.diff(old).affectedKeys().hasOnly(['name','systemType','minPlayers','maxPlayers','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','scheduleState','scheduleRevision','status','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast','paid','backgroundImageURL','tags','playerAge','contentRating','contentNotes'])
+        changed.hasAny(['scheduleRevision']) ? (
+          changed.hasOnly(['name','systemType','minPlayers','maxPlayers','description','dayOfWeek','sessionLengthHours','frequency','startTime','timeZone','localStartTime','scheduleState','scheduleRevision','status','tableType','location','virtualPlatform','platformOther','voiceService','voiceOther','recorded','broadcast','paid','backgroundImageURL','tags','playerAge','contentRating','contentNotes'])
           && next.scheduleState == 'Recruiting' && next.lifecycleStatus == old.lifecycleStatus && next.status != 'Completed'
           && next.scheduleRevision == old.scheduleRevision + 1 && futureOrUnscheduled(next)
           && (old.startTime == null || next.startTime is timestamp)
-          && (old.startMode != 'Rolling' || old.startTime != null || next.startTime == null || next.currentPlayers >= next.minPlayers))
+          && (old.startMode != 'Rolling' || old.startTime != null || next.startTime == null || next.currentPlayers >= next.minPlayers)
+        ) : changed.hasAny(['status','lifecycleStatus']) ? (
+          changed.hasOnly(['status','lifecycleStatus']) && (next.lifecycleStatus != 'Established' || (old.lifecycleStatus != 'Preparing' && next.startTime is timestamp))
+        ) : (
+          changed.hasOnly(['scheduleState']) && next.scheduleState == 'Confirmed' && next.startTime > request.time
+        )
       );
     }
     match /campaigns/{campaignId} {
@@ -107,7 +111,7 @@ service cloud.firestore {
         && futureOrUnscheduled(request.resource.data)
         && (request.resource.data.startMode != 'Rolling' || request.resource.data.startTime == null);
       allow update: if signedIn()
-        && (request.auth.uid == resource.data.gmUserId ? (gmDecide() || gmUpdate()) : (selfJoin() || selfApplyOrWithdraw() || selfLeave()))
+        && (request.auth.uid == resource.data.gmUserId ? (request.resource.data.diff(resource.data).affectedKeys().hasAny(['playerIds','pendingPlayerIds']) ? gmDecide() : gmUpdate()) : (selfJoin() || selfApplyOrWithdraw() || selfLeave()))
         && campaignValid(request.resource.data);
       allow delete: if false;
     }

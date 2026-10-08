@@ -325,3 +325,19 @@ test('invalid or duplicate campaign tags and invalid content guidance are denied
   }
   await assertSucceeds(updateDoc(ref('gm'), { tags: [], contentRating: '', playerAge: '', contentNotes: '', scheduleState: 'Recruiting', scheduleRevision: 1 }));
 });
+test('full editor saves and GM decisions stay within the rules expression budget', async () => {
+  const image = 'data:image/jpeg;base64,' + 'A'.repeat(220000);
+  const existing = { ...campaign(), startMode: 'Rolling', startTime: null, dayOfWeek: null, localStartTime: null, scheduleState: 'Recruiting', pendingPlayerIds: ['c'], backgroundImageURL: image };
+  await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), 'campaigns', 'table'), existing); });
+  const fullSave = { ...existing, tags: ['Newbie friendly','Roleplay focused','Session zero','Graphic violence'], playerAge: '18+', contentRating: 'T', contentNotes: 'Discuss boundaries.', scheduleRevision: 1 };
+  for (const key of ['gmUserId','gmName','playerIds','pendingPlayerIds','retiredPlayerIds','currentPlayers','lifecycleStatus']) delete fullSave[key];
+  await assertSucceeds(updateDoc(ref('gm'), fullSave));
+  await assertSucceeds(updateDoc(ref('gm'), { pendingPlayerIds: [], playerIds: ['a','b','c'], currentPlayers: 3, status: 'Full' }));
+  await assertSucceeds(updateDoc(ref('gm'), { startTime: Timestamp.fromMillis(Date.now() + 86400000), dayOfWeek: 'Friday', localStartTime: '19:00', scheduleRevision: 2 }));
+  await assertSucceeds(updateDoc(ref('gm'), { scheduleState: 'Confirmed' }));
+  await assertSucceeds(updateDoc(ref('gm'), { lifecycleStatus: 'Established' }));
+  await assertSucceeds(updateDoc(ref('gm'), { lifecycleStatus: 'Closed', status: 'Closed' }));
+  await assertSucceeds(updateDoc(ref('a'), { playerIds: ['b','c'], retiredPlayerIds: ['a'], currentPlayers: 2, status: 'Closed' }));
+  const saved = (await getDoc(ref(null))).data();
+  assert.equal(saved.contentRating, 'T'); assert.equal(saved.backgroundImageURL, image);
+});
